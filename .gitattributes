@@ -1,0 +1,8 @@
+* text=auto
+
+# Windows launchers and scripts are expected to use CRLF.
+*.bat text eol=crlf
+*.ps1 text eol=crlf
+
+# Patch files must keep LF endings or git apply can reject them.
+*.patch text eol=lf

@@ -1,0 +1,23 @@
+# User-supplied game data — never commit.
+Game/
+*.xex
+*.iso
+
+# Build output and generated recompiled code. The latter is reproducible from
+# mx_alive_manifest.toml + the pinned SDK. Only the small CMake boilerplate that
+# CMakeLists.txt includes at configure time is checked in.
+build/
+out/
+generated/*
+!generated/rexglue.cmake
+
+# Local development notes, screenshots, agent settings and scratch profiling
+# data are not part of the published project. Curated public docs live in
+# docs/.
+.scratch/
+.claude/
+HANDOFF.md
+CLAUDE.md
+docs/agents/
+
+*~
