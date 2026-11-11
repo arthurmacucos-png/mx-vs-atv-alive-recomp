@@ -1,0 +1,64 @@
+diff -ru shaders.pristine/pixel_formats.xesli shaders/pixel_formats.xesli
+--- shaders.pristine/pixel_formats.xesli	2026-11-11 00:10:30.275784800 -0300
++++ shaders/pixel_formats.xesli	2026-11-11 00:10:30.442487100 -0300
+@@ -147,6 +147,18 @@
+   return n.rb | (n.ga << 16);
+ }
+ 
++// mx_alive fix: k_16 / k_16_16_16_16 resolve destinations with the signed
++// repeating fraction number format must be packed as SNORM, not UNORM.
++// Packing them as UNORM dropped negative values and flipped the sign of values
++// above 0.5 once fetched as signed, which made water/terrain simulations that
++// feed back through such resolves blow up into spikes.
++uint2_xe XePackR16G16B16A16SNorm(float4_xe f) {
++  f = min(max(f, float_x4_xe(-1.0f)), float_x4_xe(1.0f)) * 32767.0f;
++  int4_xe n = int4_xe(sign(f) * floor(abs(f) + 0.5f));
++  uint4_xe u = uint4_xe(n) & 0xFFFFu;
++  return u.rb | (u.ga << 16);
++}
++
+ uint2_xe XePack16bpp4PixelsInUInt2(float4_xe pixel_0, float4_xe pixel_1,
+                                    float4_xe pixel_2, float4_xe pixel_3,
+                                    uint format) {
+diff -ru shaders.pristine/resolve.xesli shaders/resolve.xesli
+--- shaders.pristine/resolve.xesli	2026-11-11 00:10:30.271777700 -0300
++++ shaders/resolve.xesli	2026-11-11 00:10:30.441481600 -0300
+@@ -84,6 +84,9 @@
+     uint2_xe dest_xy_offset_scaled;
+     uint sample_select;
+     uint dest_base;
++    // mx_alive fix: SurfaceNumberFormat of the destination (1 = signed
++    // repeating fraction / snorm).
++    uint dest_num_format;
+   #endif  // XE_RESOLVE_CLEAR
+ };
+ 
+@@ -128,6 +131,7 @@
+     resolve_info.dest_is_array = (dest_info & (1u << 3u)) != 0u;
+     resolve_info.dest_slice = (dest_info >> 4u) & ((1u << 3u) - 1u);
+     resolve_info.dest_format = (dest_info >> 7u) & ((1u << 6u) - 1u);
++    resolve_info.dest_num_format = (dest_info >> 13u) & ((1u << 3u) - 1u);
+     resolve_info.dest_exp_bias_factor = int_bits_to_float_xe(
+         (int(dest_info) << (32 - (16 + 6)) >> (32 - 6) << 23) +
+         float_bits_to_int_xe(1.0f));
+diff -ru shaders.pristine/resolve_full_16bpp.xesli shaders/resolve_full_16bpp.xesli
+--- shaders.pristine/resolve_full_16bpp.xesli	2026-11-11 00:10:30.276785600 -0300
++++ shaders/resolve_full_16bpp.xesli	2026-11-11 00:10:30.442487100 -0300
+@@ -43,8 +43,15 @@
+       XeResolveColorCopySourcePixelAddressIntsYHalfPixelOffsetFilling(
+           resolve_info, pixel_index),
+       pixel_0, pixel_1, pixel_2, pixel_3);
+-  uint2_xe packed = XePack16bpp4PixelsInUInt2(
+-      pixel_0, pixel_1, pixel_2, pixel_3, resolve_info.dest_format);
++  uint2_xe packed;
++  // mx_alive fix: kXenosFormat_16 (24) with signed repeating fraction (1).
++  if (resolve_info.dest_format == 24u && resolve_info.dest_num_format == 1u) {
++    packed = XePackR16G16B16A16SNorm(
++        float4_xe(pixel_0.r, pixel_1.r, pixel_2.r, pixel_3.r));
++  } else {
++    packed = XePack16bpp4PixelsInUInt2(
++        pixel_0, pixel_1, pixel_2, pixel_3, resolve_info.dest_format);
++  }
+   dont_flatten_xe
+   if (pixel_index.x == 0u &&
+       resolve_info.half_pixel_offset_fill_source.x != 0u) {
