@@ -13,6 +13,7 @@ if not exist "%EXE%" (
     echo Run tools\build-game.bat first.
     exit /b 1
 )
-start "" "%EXE%" --game_data_root "%GAME%" --log_level debug --mnk_mode ^
+call "%~dp0controller-env.bat"
+start "" "%EXE%" --game_data_root "%GAME%" --log_level debug --mnk_mode %CONTROLLER_ARGS% ^
     --gpu_allow_invalid_fetch_constants --d3d12_readback_resolve ^
     --query_occlusion_fake_sample_count=-1 --video_mode_refresh_rate %REFRESH%

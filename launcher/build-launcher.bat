@@ -17,4 +17,11 @@ if not exist "%HERE%icon.ico" powershell -NoProfile -ExecutionPolicy Bypass -Fil
     /r:System.dll /r:System.Core.dll /r:System.Drawing.dll /r:System.Windows.Forms.dll ^
     "%HERE%MxAliveLauncher.cs"
 if errorlevel 1 exit /b 1
+"%CSC%" /nologo /target:winexe /optimize+ /platform:anycpu ^
+    /win32icon:"%HERE%icon.ico" ^
+    /out:"%ROOT%\MX Alive Setup.exe" ^
+    /r:System.dll /r:System.Core.dll /r:System.Drawing.dll /r:System.Windows.Forms.dll ^
+    /r:System.IO.Compression.dll /r:System.IO.Compression.FileSystem.dll ^
+    "%HERE%MxAliveSetup.cs"
+if errorlevel 1 exit /b 1
 echo LAUNCHER_BUILD_OK

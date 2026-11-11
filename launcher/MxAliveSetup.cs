@@ -1,0 +1,438 @@
+// MX vs. ATV Alive - one-click installer.
+// Downloads this project, installs the toolchain with winget, fetches
+// rexglue-sdk, copies the user's OWN game files, builds everything and creates
+// a desktop shortcut. No game files are downloaded or distributed.
+// C# 5 / WinForms: builds with the csc.exe that ships with Windows
+// (launcher\build-launcher.bat).
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Drawing;
+using System.IO;
+using System.IO.Compression;
+using System.Linq;
+using System.Net;
+using System.Text;
+using System.Threading;
+using System.Windows.Forms;
+
+namespace MxAliveSetup
+{
+    static class Config
+    {
+        // Repository that holds this project (GitHub "Download ZIP" of the default branch).
+        public const string RepoZipUrl = "https://github.com/arthurmacucos-png/mx-vs-atv-alive-recomp/archive/refs/heads/main.zip";
+        public const string SdkRepo = "https://github.com/rexglue/rexglue-sdk.git";
+        public const string SdkCommit = "f5337cdc947ff6d4c4196737e2c807a48f2a1fc2"; // v0.10.0
+        public const string GameSubdir = @"Game\MX vs. ATV Alive (USA Europe)";
+    }
+
+    static class Theme
+    {
+        public static readonly Color Back = Color.FromArgb(18, 18, 20);
+        public static readonly Color Panel = Color.FromArgb(30, 30, 33);
+        public static readonly Color Field = Color.FromArgb(42, 42, 46);
+        public static readonly Color Border = Color.FromArgb(58, 58, 64);
+        public static readonly Color Text = Color.FromArgb(232, 232, 232);
+        public static readonly Color Dim = Color.FromArgb(150, 150, 156);
+        public static readonly Color Accent = Color.FromArgb(222, 228, 46);
+        public static readonly Color Good = Color.FromArgb(90, 200, 110);
+        public static readonly Color Bad = Color.FromArgb(235, 80, 70);
+    }
+
+    class SetupForm : Form
+    {
+        readonly string[] stepNames = {
+            "Conferir a sua cópia do jogo",
+            "Baixar o projeto",
+            "Instalar as ferramentas (Git, CMake, Ninja, LLVM, Visual Studio)",
+            "Baixar o rexglue-sdk",
+            "Compilar o rexglue com a correção da água",
+            "Recompilar o jogo (30 a 60 min na primeira vez)",
+            "Criar o atalho e abrir o launcher"
+        };
+        readonly List<Label> stepIcons = new List<Label>();
+        readonly List<Label> stepLabels = new List<Label>();
+        TextBox installDir, gameDir, log;
+        Label status;
+        ProgressBar bar;
+        Button install, browseInstall, browseGame;
+        StreamWriter logFile;
+        string logPath;
+
+        public SetupForm()
+        {
+            Text = "MX vs. ATV Alive - instalação";
+            BackColor = Theme.Back; ForeColor = Theme.Text;
+            Font = new Font("Segoe UI", 9.5f);
+            FormBorderStyle = FormBorderStyle.FixedSingle; MaximizeBox = false;
+            StartPosition = FormStartPosition.CenterScreen;
+            ClientSize = new Size(760, 720);
+            try { Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath); } catch { }
+
+            var title = new Label { Text = "MX vs. ATV Alive", Font = new Font("Segoe UI Semibold", 20f), ForeColor = Theme.Accent, AutoSize = true, Location = new Point(20, 14) };
+            var sub = new Label { Text = "Port nativo para PC  ·  instalação em um clique", Font = new Font("Segoe UI Semibold", 11f), AutoSize = true, Location = new Point(23, 54) };
+            var legal = new Label { Text = "O jogo NÃO é baixado: você escolhe a pasta da SUA cópia de Xbox 360 (com o default.xex).", ForeColor = Theme.Dim, AutoSize = true, Location = new Point(23, 80), Font = new Font("Segoe UI", 8.5f) };
+            Controls.AddRange(new Control[] { title, sub, legal });
+
+            AddRow("Instalar em", 112, out installDir, out browseInstall);
+            installDir.Text = DefaultInstallDir();
+            browseInstall.Click += delegate { PickFolder(installDir, "Escolha onde instalar (evite pastas do OneDrive)"); };
+            AddRow("Pasta do jogo", 148, out gameDir, out browseGame);
+            browseGame.Click += delegate { PickFolder(gameDir, "Escolha a pasta do MX vs. ATV Alive de Xbox 360 (a que tem o default.xex)"); };
+
+            int y = 194;
+            for (int i = 0; i < stepNames.Length; i++)
+            {
+                var icon = new Label { Text = "•", ForeColor = Theme.Dim, Font = new Font("Segoe UI Semibold", 11f), Location = new Point(24, y), Size = new Size(26, 24) };
+                var lbl = new Label { Text = stepNames[i], ForeColor = Theme.Dim, Location = new Point(52, y + 2), Size = new Size(680, 22) };
+                stepIcons.Add(icon); stepLabels.Add(lbl);
+                Controls.Add(icon); Controls.Add(lbl);
+                y += 28;
+            }
+
+            bar = new ProgressBar { Location = new Point(24, y + 8), Size = new Size(712, 14), Maximum = stepNames.Length * 10 };
+            status = new Label { Text = "Escolha a pasta do jogo e clique em INSTALAR.", ForeColor = Theme.Dim, Location = new Point(24, y + 28), Size = new Size(712, 22) };
+            Controls.Add(bar); Controls.Add(status);
+
+            log = new TextBox { Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Vertical, BackColor = Color.FromArgb(12, 12, 14), ForeColor = Color.FromArgb(190, 190, 190), Font = new Font("Consolas", 8.5f), BorderStyle = BorderStyle.FixedSingle, Location = new Point(24, y + 56), Size = new Size(712, 640 - (y + 56)) };
+            Controls.Add(log);
+
+            install = new Button { Text = "INSTALAR", Font = new Font("Segoe UI Semibold", 13f), FlatStyle = FlatStyle.Flat, BackColor = Theme.Accent, ForeColor = Color.FromArgb(18, 20, 24), Location = new Point(24, 656), Size = new Size(200, 46), Cursor = Cursors.Hand };
+            install.FlatAppearance.BorderColor = Theme.Accent;
+            install.Click += delegate { Start(); };
+            Controls.Add(install);
+            var note = new Label { Text = "Precisa de internet e cerca de 15 GB livres. Pode pedir permissão de administrador.", ForeColor = Theme.Dim, Font = new Font("Segoe UI", 8.5f), Location = new Point(240, 672), Size = new Size(500, 20) };
+            Controls.Add(note);
+
+            // Running from inside an extracted project: offer that folder.
+            string here = Path.GetDirectoryName(Application.ExecutablePath);
+            if (File.Exists(Path.Combine(here, @"tools\build-game.bat"))) installDir.Text = here;
+        }
+
+        static string DefaultInstallDir()
+        {
+            string drive = Path.GetPathRoot(Environment.GetFolderPath(Environment.SpecialFolder.Windows));
+            return Path.Combine(drive, @"Jogos\MX vs ATV Alive");
+        }
+
+        void AddRow(string label, int y, out TextBox box, out Button button)
+        {
+            Controls.Add(new Label { Text = label, Location = new Point(24, y + 4), Size = new Size(110, 22) });
+            box = new TextBox { Location = new Point(136, y), Size = new Size(500, 26), BackColor = Theme.Field, ForeColor = Theme.Text, BorderStyle = BorderStyle.FixedSingle };
+            button = new Button { Text = "Procurar...", Location = new Point(644, y - 1), Size = new Size(92, 28), FlatStyle = FlatStyle.Flat, BackColor = Theme.Field, ForeColor = Theme.Text };
+            button.FlatAppearance.BorderColor = Theme.Border;
+            Controls.Add(box); Controls.Add(button);
+        }
+
+        void PickFolder(TextBox box, string description)
+        {
+            using (var d = new FolderBrowserDialog { Description = description, SelectedPath = box.Text })
+                if (d.ShowDialog(this) == DialogResult.OK) box.Text = d.SelectedPath;
+        }
+
+        // ---------- UI helpers (thread safe) ----------
+        void Ui(Action a) { if (InvokeRequired) BeginInvoke(a); else a(); }
+
+        void Log(string line)
+        {
+            if (line == null) return;
+            lock (this) { if (logFile != null) { logFile.WriteLine(line); logFile.Flush(); } }
+            Ui(() =>
+            {
+                log.AppendText(line + Environment.NewLine);
+                if (log.TextLength > 200000) log.Text = log.Text.Substring(log.TextLength - 120000);
+            });
+        }
+
+        void SetStep(int i, string state)
+        {
+            Ui(() =>
+            {
+                var icon = stepIcons[i]; var lbl = stepLabels[i];
+                if (state == "run") { icon.Text = "►"; icon.ForeColor = Theme.Accent; lbl.ForeColor = Theme.Text; status.Text = stepNames[i] + "..."; bar.Value = Math.Min(bar.Maximum, i * 10 + 2); }
+                else if (state == "ok") { icon.Text = "✓"; icon.ForeColor = Theme.Good; lbl.ForeColor = Theme.Text; bar.Value = Math.Min(bar.Maximum, (i + 1) * 10); }
+                else if (state == "skip") { icon.Text = "✓"; icon.ForeColor = Theme.Dim; lbl.Text = stepNames[i] + "  (já estava pronto)"; bar.Value = Math.Min(bar.Maximum, (i + 1) * 10); }
+                else if (state == "fail") { icon.Text = "✗"; icon.ForeColor = Theme.Bad; lbl.ForeColor = Theme.Bad; }
+            });
+        }
+
+        class StepFailed : Exception { public StepFailed(string m) : base(m) { } }
+
+        // ---------- process runner ----------
+        int Run(string file, string args, string workDir)
+        {
+            Log("> " + file + " " + args);
+            var psi = new ProcessStartInfo(file, args)
+            {
+                UseShellExecute = false, CreateNoWindow = true,
+                RedirectStandardOutput = true, RedirectStandardError = true,
+                WorkingDirectory = workDir ?? Environment.CurrentDirectory,
+                StandardOutputEncoding = Encoding.UTF8, StandardErrorEncoding = Encoding.UTF8
+            };
+            psi.EnvironmentVariables["PATH"] = FreshPath();
+            using (var p = new Process { StartInfo = psi })
+            {
+                p.OutputDataReceived += (s, e) => Log(e.Data);
+                p.ErrorDataReceived += (s, e) => Log(e.Data);
+                p.Start(); p.BeginOutputReadLine(); p.BeginErrorReadLine();
+                p.WaitForExit();
+                return p.ExitCode;
+            }
+        }
+
+        static string FreshPath()
+        {
+            return @"C:\Program Files\LLVM\bin;C:\Program Files\Git\cmd;" +
+                Environment.GetEnvironmentVariable("Path", EnvironmentVariableTarget.Machine) + ";" +
+                Environment.GetEnvironmentVariable("Path", EnvironmentVariableTarget.User) + ";" +
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), @"Microsoft\WinGet\Links");
+        }
+
+        static bool Have(string exe)
+        {
+            foreach (var dir in FreshPath().Split(';'))
+            {
+                try { if (dir.Length > 0 && File.Exists(Path.Combine(dir.Trim(), exe + ".exe"))) return true; } catch { }
+            }
+            return false;
+        }
+
+        // ---------- install ----------
+        void Start()
+        {
+            string root = installDir.Text.Trim(), game = gameDir.Text.Trim();
+            if (game.Length == 0 || !File.Exists(Path.Combine(game, "default.xex")))
+            {
+                MessageBox.Show(this, "Escolha a pasta do jogo que contém o default.xex.", "Pasta do jogo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+            if (root.IndexOf("OneDrive", StringComparison.OrdinalIgnoreCase) >= 0 &&
+                MessageBox.Show(this, "Instalar dentro do OneDrive vai sincronizar uns 8 GB com a nuvem. Continuar mesmo assim?", "OneDrive", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
+                return;
+
+            install.Enabled = browseGame.Enabled = browseInstall.Enabled = false;
+            installDir.ReadOnly = gameDir.ReadOnly = true;
+            Directory.CreateDirectory(root);
+            logPath = Path.Combine(root, "setup.log");
+            logFile = new StreamWriter(logPath, false, Encoding.UTF8);
+            Log("MX vs. ATV Alive setup  " + DateTime.Now + "  |  Windows " + Environment.OSVersion.Version);
+
+            var t = new Thread(() => Install(root, game)) { IsBackground = true };
+            t.Start();
+        }
+
+        void Install(string root, string game)
+        {
+            int step = 0;
+            try
+            {
+                // 0. Game check.
+                SetStep(step, "run");
+                string info = CheckXex(Path.Combine(game, "default.xex"));
+                Log("default.xex: " + info);
+                if (!info.Contains("5451087B") || !info.Contains("5306E1D5"))
+                    throw new StepFailed("Esta cópia não é a versão suportada (Xbox 360 USA/Europa, Title 5451087B, Media 5306E1D5).");
+                SetStep(step++, "ok");
+
+                // 1. Project.
+                SetStep(step, "run");
+                if (File.Exists(Path.Combine(root, @"tools\build-game.bat"))) SetStep(step++, "skip");
+                else { DownloadProject(root); SetStep(step++, "ok"); }
+
+                // 2. Toolchain.
+                SetStep(step, "run");
+                bool any = false;
+                if (!Have("git")) { any = true; Winget("Git.Git", null); }
+                if (!Have("cmake")) { any = true; Winget("Kitware.CMake", null); }
+                if (!Have("ninja")) { any = true; Winget("Ninja-build.Ninja", null); }
+                if (!Have("clang")) { any = true; Winget("LLVM.LLVM", null); }
+                if (!HaveVisualStudio())
+                {
+                    any = true;
+                    Log("Instalando Visual Studio 2022 Build Tools (C++). Pode levar 10-20 minutos.");
+                    Winget("Microsoft.VisualStudio.2022.BuildTools", "--override \"--wait --passive --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended\"");
+                }
+                foreach (var tool in new[] { "git", "cmake", "ninja", "clang" })
+                    if (!Have(tool)) throw new StepFailed(tool + " não ficou disponível. Reinicie o PC e rode o instalador de novo.");
+                if (!HaveVisualStudio()) throw new StepFailed("Visual Studio Build Tools (C++) não foi instalado. Reinicie o PC e rode de novo.");
+                SetStep(step++, any ? "ok" : "skip");
+
+                // 3. rexglue-sdk.
+                SetStep(step, "run");
+                string sdk = Path.Combine(root, @"third_party\rexglue-sdk");
+                if (File.Exists(Path.Combine(sdk, "CMakeLists.txt"))) SetStep(step++, "skip");
+                else
+                {
+                    if (Directory.Exists(sdk)) Directory.Delete(sdk, true);
+                    if (Run("git", "clone " + Config.SdkRepo + " \"" + sdk + "\"", root) != 0 ||
+                        Run("git", "-C \"" + sdk + "\" checkout " + Config.SdkCommit, root) != 0 ||
+                        Run("git", "-C \"" + sdk + "\" submodule update --init --recursive", root) != 0)
+                        throw new StepFailed("Falha ao baixar o rexglue-sdk (confira a internet).");
+                    SetStep(step++, "ok");
+                }
+
+                // Copy game files (needed before the game build).
+                string dest = Path.Combine(root, Config.GameSubdir);
+                if (!File.Exists(Path.Combine(dest, "default.xex")))
+                {
+                    Log("Copiando os arquivos do jogo para " + dest + " ...");
+                    if (Run("robocopy", "\"" + game + "\" \"" + dest + "\" /E /NFL /NDL /NJH /NJS /NP", root) >= 8)
+                        throw new StepFailed("Falha ao copiar os arquivos do jogo.");
+                }
+
+                // 4. rexglue.
+                SetStep(step, "run");
+                if (File.Exists(Path.Combine(sdk, @"out\install\win-amd64\bin\rexglue.exe"))) SetStep(step++, "skip");
+                else
+                {
+                    if (Run("cmd.exe", "/c \"\"" + Path.Combine(root, @"tools\build-rexglue.bat") + "\"\"", root) != 0)
+                        throw new StepFailed("Falha ao compilar o rexglue. Veja o log.");
+                    SetStep(step++, "ok");
+                }
+
+                // 5. Game.
+                SetStep(step, "run");
+                if (Run("cmd.exe", "/c \"\"" + Path.Combine(root, @"tools\build-game.bat") + "\"\"", root) != 0)
+                    throw new StepFailed("Falha ao recompilar o jogo. Veja o log.");
+                SetStep(step++, "ok");
+
+                // 6. Shortcut + launcher.
+                SetStep(step, "run");
+                string launcher = Path.Combine(root, "MX Alive Launcher.exe");
+                if (!File.Exists(launcher))
+                    Run("cmd.exe", "/c \"\"" + Path.Combine(root, @"launcher\build-launcher.bat") + "\"\"", root);
+                CreateShortcut(launcher, root);
+                SetStep(step++, "ok");
+
+                Log("PRONTO!");
+                Ui(() =>
+                {
+                    status.Text = "Pronto! Atalho \"MX vs ATV Alive\" criado na Área de Trabalho.";
+                    status.ForeColor = Theme.Good;
+                    install.Text = "JOGAR"; install.Enabled = true;
+                    install.Click += delegate { Process.Start(new ProcessStartInfo(launcher) { WorkingDirectory = root }); Close(); };
+                });
+                Process.Start(new ProcessStartInfo(launcher) { WorkingDirectory = root });
+            }
+            catch (Exception ex)
+            {
+                string msg = ex is StepFailed ? ex.Message : ex.ToString();
+                Log("ERRO: " + msg);
+                SetStep(Math.Min(step, stepNames.Length - 1), "fail");
+                Ui(() =>
+                {
+                    status.Text = "Erro: " + ex.Message;
+                    status.ForeColor = Theme.Bad;
+                    install.Text = "TENTAR DE NOVO"; install.Enabled = true;
+                    browseGame.Enabled = browseInstall.Enabled = true;
+                    installDir.ReadOnly = gameDir.ReadOnly = false;
+                    MessageBox.Show(this, ex.Message + "\n\nO log completo foi salvo em:\n" + logPath +
+                        "\n\nMande esse arquivo para quem estiver te ajudando.", "Erro na instalação",
+                        MessageBoxButtons.OK, MessageBoxIcon.Error);
+                });
+            }
+            finally
+            {
+                lock (this) { if (logFile != null) { logFile.Dispose(); logFile = null; } }
+            }
+        }
+
+        void DownloadProject(string root)
+        {
+            if (Config.RepoZipUrl.Length == 0)
+                throw new StepFailed("Este instalador ainda não tem o endereço do repositório configurado. Baixe o projeto em ZIP, extraia e rode o instalador de dentro da pasta.");
+            ServicePointManager.SecurityProtocol = (SecurityProtocolType)3072; // TLS 1.2
+            string zip = Path.Combine(Path.GetTempPath(), "mx-alive-project.zip");
+            Log("Baixando " + Config.RepoZipUrl);
+            using (var wc = new WebClient())
+            {
+                wc.Headers.Add("User-Agent", "MxAliveSetup");
+                wc.DownloadFile(Config.RepoZipUrl, zip);
+            }
+            string tmp = Path.Combine(Path.GetTempPath(), "mx-alive-project");
+            if (Directory.Exists(tmp)) Directory.Delete(tmp, true);
+            ZipFile.ExtractToDirectory(zip, tmp);
+            // GitHub zips contain a single top-level folder. Use the folder that
+            // holds this project's files (it may also sit in a subfolder).
+            string top = Directory.GetDirectories(tmp).First();
+            var marker = Directory.GetFiles(top, "rexglue-mx-fixes.patch", SearchOption.AllDirectories).FirstOrDefault();
+            if (marker == null) throw new StepFailed("O ZIP baixado não tem a correção da água (patches\rexglue-mx-fixes.patch).");
+            top = Path.GetDirectoryName(Path.GetDirectoryName(marker));
+            Log("Usando a pasta do projeto: " + top.Substring(tmp.Length));
+            foreach (var f in Directory.GetFiles(top, "*", SearchOption.AllDirectories))
+            {
+                string target = Path.Combine(root, f.Substring(top.Length + 1));
+                Directory.CreateDirectory(Path.GetDirectoryName(target));
+                File.Copy(f, target, true);
+            }
+            Directory.Delete(tmp, true); File.Delete(zip);
+            Log("Projeto extraído em " + root);
+        }
+
+        void Winget(string id, string extra)
+        {
+            Log("Instalando " + id + " ...");
+            int code = Run("winget", "install --id " + id + " -e --accept-package-agreements --accept-source-agreements " +
+                (extra ?? "--silent"), null);
+            // winget returns non-zero for "already installed"; availability is checked afterwards.
+            Log("winget terminou com código " + code);
+        }
+
+        static bool HaveVisualStudio()
+        {
+            string vswhere = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), @"Microsoft Visual Studio\Installer\vswhere.exe");
+            if (!File.Exists(vswhere)) return false;
+            try
+            {
+                var p = Process.Start(new ProcessStartInfo(vswhere, "-latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath")
+                { UseShellExecute = false, RedirectStandardOutput = true, CreateNoWindow = true });
+                string o = p.StandardOutput.ReadToEnd(); p.WaitForExit();
+                return o.Trim().Length > 0;
+            }
+            catch { return false; }
+        }
+
+        static uint BE32(byte[] d, int o) { return (uint)(d[o] << 24 | d[o + 1] << 16 | d[o + 2] << 8 | d[o + 3]); }
+
+        static string CheckXex(string path)
+        {
+            byte[] d = new byte[0x4000];
+            using (var f = File.OpenRead(path)) f.Read(d, 0, d.Length);
+            if (d[0] != 'X' || d[1] != 'E' || d[2] != 'X' || d[3] != '2') return "inválido";
+            uint count = BE32(d, 0x14);
+            for (int i = 0; i < count && 0x20 + i * 8 <= d.Length; i++)
+                if (BE32(d, 0x18 + i * 8) == 0x00040006)
+                {
+                    int o = (int)BE32(d, 0x1C + i * 8);
+                    return string.Format("Title {0:X8} Media {1:X8}", BE32(d, o + 12), BE32(d, o));
+                }
+            return "sem informações";
+        }
+
+        void CreateShortcut(string target, string workDir)
+        {
+            string lnk = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "MX vs ATV Alive.lnk");
+            Type t = Type.GetTypeFromProgID("WScript.Shell");
+            object shell = Activator.CreateInstance(t);
+            object sc = t.InvokeMember("CreateShortcut", System.Reflection.BindingFlags.InvokeMethod, null, shell, new object[] { lnk });
+            Type st = sc.GetType();
+            st.InvokeMember("TargetPath", System.Reflection.BindingFlags.SetProperty, null, sc, new object[] { target });
+            st.InvokeMember("WorkingDirectory", System.Reflection.BindingFlags.SetProperty, null, sc, new object[] { workDir });
+            st.InvokeMember("IconLocation", System.Reflection.BindingFlags.SetProperty, null, sc, new object[] { target + ",0" });
+            st.InvokeMember("Save", System.Reflection.BindingFlags.InvokeMethod, null, sc, null);
+            Log("Atalho criado: " + lnk);
+        }
+    }
+
+    static class Program
+    {
+        [STAThread]
+        static void Main()
+        {
+            Application.EnableVisualStyles();
+            Application.SetCompatibleTextRenderingDefault(false);
+            Application.Run(new SetupForm());
+        }
+    }
+}

@@ -5,7 +5,8 @@
 #
 # Usage: powershell -NoProfile -ExecutionPolicy Bypass -File tools\backup-save.ps1
 param(
-    [string]$SaveRoot = (Join-Path $env:USERPROFILE "Documents\mx_alive"),
+    # The real Documents folder (it is redirected when OneDrive backs it up).
+    [string]$SaveRoot = (Join-Path ([Environment]::GetFolderPath('MyDocuments')) "mx_alive"),
     [int]$Keep = 20
 )
 

@@ -1,180 +1,187 @@
-# MX vs. ATV Alive — Native Windows Recompilation
+# 🏍️ MX vs. ATV Alive — Port nativo para PC (continuação)
 
-A static recompilation of the Xbox 360 release of **MX vs. ATV Alive**
-(Title ID `5451087B`) into a native Windows x64 executable, built with
-[rexglue-sdk](https://github.com/rexglue/rexglue-sdk) v0.10.0.
+**A água funciona! 🌊** Este projeto continua a recompilação estática nativa de
+**MX vs. ATV Alive** (Xbox 360, Title ID `5451087B`) para Windows x64 e corrige
+o bug dos **"espinhos" na água e no terreno**. Esse bug existe no Xenia há mais
+de dois anos
+([xenia-canary/game-compatibility#596](https://github.com/xenia-canary/game-compatibility/issues/596)),
+e até onde sabemos esta é **a primeira vez que alguém o corrigiu**.
 
-The game boots, renders, plays audio, saves, and runs a full Short Track race
-and Free Ride at a verified 60 fps. It is a working vertical slice and a
-starting point, not a finished port.
+Rodando liso a **60 FPS**, com Free Ride, praia, lama, água espirrando, DLCs
+carregando e controle de PS5 funcionando. Ver a moto entrar na água sem o mapa
+virar um campo de estalagmites foi muito bom. 😄
 
 > [!IMPORTANT]
-> **Unmaintained.** The original author is not continuing this project. It is
-> published so the work is not lost and can be picked up by someone else.
-> Forks and pull requests are welcome, but there is no maintainer to review
-> them.
+> **Nenhum arquivo do jogo está incluído.** Este repositório não contém o
+> executável, os assets, as DLCs nem o código recompilado. Você precisa da sua
+> **própria cópia** legítima do jogo de Xbox 360. Veja [Legal](#legal).
 
-> [!WARNING]
-> **No game data is included.** This repository contains no game executable,
-> assets, or generated recompiled code. You must supply your own legally
-> obtained copy of the Xbox 360 game. See [Legal](#legal).
+---
 
-## Status
+## 🙏 Agradecimento especial
 
-| Milestone | State | What it means |
-|---|---|---|
-| M0 — Toolchain | ✅ Passed | rexglue builds; the XEX is ingested; ~41.7k functions are recompiled and linked |
-| M1 — Boot | ✅ Passed | Main menu, attract videos, audio, controller input, and a PC save work |
-| M2 — Vertical slice | ✅ Passed | Full Short Track race and Free Ride; full HUD and audio; no crashes observed |
-| M2.5 — 60 fps | ✅ Passed | ~59–60 guest fps with a 120 Hz guest refresh |
-| M3 — Full single-player | 🟡 In progress | One National event completed; all 18 levels, progression, and long-session saves remain |
-| M4 — Splitscreen | ⬜ Not started | |
-| M5 — High frame rates | 🟡 Best-effort | 60 supported; 120/144/240 do not reach target in heavy races |
-| M6 — Polish | ⬜ Not started | Enhancements, DLC, and an online/LIVE revisit |
+Este projeto só existe por causa do **[gw1337x](https://github.com/gw1337x)**,
+que fez o trabalho pesado em
+[mx-vs-atv-alive-recomp](https://github.com/gw1337x/mx-vs-atv-alive-recomp):
+recompilou as ~41,7 mil funções, fez o jogo dar boot, rodar a 60 FPS, salvar e
+completar corridas, e documentou tudo com cuidado. Quando o projeto foi
+publicado sem manutenção, ficou o pedido: *"forks são bem-vindos, alguém pode
+continuar"*. Então continuamos. **Valeu demais, gw1337x!** 🏆
 
-Detailed test results, performance measurements, and open issues are in
-[docs/STATUS.md](docs/STATUS.md).
+Obrigado também ao **rexglue-sdk** (Tom Clay e contribuidores), ao **Xenia**
+(Ben Vanik, Triang3l e a equipe do Xenia Canary), à comunidade de engenharia
+reversa citada em [docs/CREDITS.md](docs/CREDITS.md) e à **Rainbow Studios /
+THQ Nordic** pelo jogo.
 
-## What works
+---
 
-- Native executable; no emulator or interpreter fallback in the hot path.
-- Main menu, attract/Bink video playback, and menu navigation.
-- Short Track races and Free Ride with the full HUD, audio (XMA/XAudio2), and
-  XInput controller input. Keyboard/mouse input is available via `--mnk_mode`.
-- Saves and profile data written to a PC-native directory.
-- Console 30 and 60 fps presets verified; 1080p guest mode verified.
-- 120/144/240 presets are exposed but best-effort: races measured ~85–95 fps
-  and Free Ride 110–120 fps on the reference machine.
-- One National event completed with Rider XP and bike XP awards; one
-  achievement unlock observed.
+## ✨ O que há de novo
 
-## What is missing
+| | |
+|---|---|
+| 🌊 **Correção dos espinhos na água/terreno** | O shader de cópia (`resolve_full_16bpp`) gravava destinos `k_16` **com sinal** como se fossem **sem sinal**. A simulação de ondas lia os valores com o sinal trocado, se realimentava e explodia. Agora o empacotamento SNORM está certo. Detalhes completos em [patches/water-fix](patches/water-fix/README.md). |
+| 🎮 **Launcher gráfico** | `MX Alive Launcher.exe`: resolução, FPS, upscaling (CAS/FSR), tela cheia, idioma, controles detectados, teclado e mouse, backup automático do save, logs e atalho na Área de Trabalho. Compila com o `csc` que já vem no Windows. |
+| 🕹️ **Controle de PS5 e genéricos** | Backend SDL3 com HIDAPI (DualSense, DualShock 4, Switch Pro) e o [SDL_GameControllerDB](https://github.com/mdqinc/SDL_GameControllerDB) para controles genéricos. Não precisa de DS4Windows. |
+| 📦 **Instalador de DLC** | Extrai pacotes STFS (LIVE/PIRS) da **sua** cópia para o formato que o rexglue espera, com o arquivo `.header` de licença. Pelo launcher (**Instalar DLC...**) ou por `tools/install-dlc.py`. |
+| 🛠️ **Correções nos scripts** | Cvars do módulo gráfico agora são passados como `--nome=valor` (o formato `--nome valor` era ignorado em silêncio). O backup do save agora acha a pasta Documentos mesmo quando ela é redirecionada pro OneDrive. |
+| 🔬 **Diagnóstico de GPU** | `--log_vs_texture_fetch` registra texturas lidas por vertex shaders, cada resolve distinto e recargas de textura. Foi o que permitiu achar o bug. |
 
-- **M3:** only part of the single-player flow has been tested. All 18 playable
-  levels, event unlocks, full Rider/Vehicle XP progression, and long-session
-  saves still need validation.
-- **M4:** splitscreen has not been started.
-- **M6:** DLC, online/LIVE, leaderboards, enhancements, and a settings UI are
-  out of scope or untested.
-- **Known bugs:** water textures corrupt when driving into water in Free Ride;
-  `resolution_scale=2` (2K) shows artifacts and crashed mid-save once, damaging
-  the save; the save-transition Bink resource lookup returns null (worked
-  around with two mid-asm hooks); the high-FPS ceiling is CPU-bound.
-- No pixel/behaviour parity pass against the console or Xenia has been done.
+## 🔍 Como o bug foi encontrado (versão curta)
 
-## Quick start
+1. Os espinhos apareciam **exatamente onde a moto passava** e se espalhavam,
+   com a textura branca e azul da água.
+2. O diagnóstico novo mostrou que o vertex shader da água lê uma textura `k_16`
+   **com sinal** de 512×512, escrita por um **resolve** de um render target
+   `k_32_FLOAT`.
+3. Lendo essa textura direto da memória do jogo: um círculo em volta da moto
+   cheio de **ruído de −32768 a +32767**. A simulação de ondas tinha explodido.
+4. O assembly do shader de resolve mostrou `mov_sat` seguido de `* 65535`, ou
+   seja, empacotamento **UNORM** num destino **SNORM**.
+5. O fonte XeSL da mesma versão do Xenia compila para **exatamente o mesmo
+   assembly** que o rexglue usa. Com a correção aplicada só nesse caso, a água
+   voltou ao normal.
 
-### Requirements
+`--readback_resolve=full` **não** resolve. O problema nunca foi o atraso da
+cópia, e sim a conversão.
 
-- Windows 10/11 x64
-- Visual Studio 2022 Build Tools with the **Desktop development with C++**
-  workload (MSVC v143 and a Windows 10/11 SDK)
-- LLVM/Clang 18+ (22.1.8 tested) and CMake 3.25+ (3.31.8 tested) on `PATH`
-- Ninja 1.13+ (bundled with recent Visual Studio/CMake installs)
-- Git for Windows and Node.js 20+ (Node is used only by the dev tools)
-- A DirectX 12 GPU
-- Your own copy of the Xbox 360 game
+---
 
-### Build and run
+## 🚀 Instalação fácil (um clique)
+
+1. Baixe o **`MX Alive Setup.exe`** (em **Releases**, ou aqui no repositório).
+2. Abra, escolha a pasta da **sua** cópia do jogo de Xbox 360 (a que tem o
+   `default.xex`) e clique em **INSTALAR**.
+
+O Setup baixa o projeto sozinho, mostra cada etapa na tela e, se algo der
+errado, salva um `setup.log` na pasta de instalação pra você mandar na issue.
+Quem já baixou o repositório também pode usar o **`INSTALAR.bat`**.
+
+O instalador confere se a versão é a certa, instala as ferramentas pelo
+`winget`, baixa o rexglue, aplica a correção da água, recompila o jogo (a
+primeira vez leva de 30 a 60 minutos) e cria o atalho **MX vs ATV Alive** na
+Área de Trabalho. No fim, o launcher abre sozinho.
+
+> **Por que não tem o `mx_alive.exe` pronto pra baixar?** Ele é o próprio
+> código do jogo traduzido para PC, gerado a partir do seu `default.xex`.
+> Distribuir esse arquivo seria distribuir o jogo. Por isso, como em todo
+> projeto de recompilação (UnleashedRecomp, N64Recomp...), cada um gera o seu.
+> O **`MX Alive Launcher.exe`** já vem pronto no repositório.
+
+## 🧰 Compilação manual
+
+### Requisitos
+
+- Windows 10/11 x64 e uma GPU com DirectX 12
+- Visual Studio 2022 Build Tools (workload **Desktop development with C++**)
+- LLVM/Clang 18+, CMake 3.25+, Ninja, Git e Node.js 20+
+- **Sua própria cópia** do MX vs. ATV Alive de Xbox 360 (disco USA/Europa,
+  Media ID `5306E1D5`, versão `0.0.0.3`)
+
+Todos podem ser instalados com o `winget`:
 
 ```bat
-git clone --recursive https://github.com/gw1337x/mx-vs-atv-alive-recomp.git
-cd mx-vs-atv-alive-recomp
-
-rem Build and install rexglue v0.10.0 with this project's local patches.
-tools\build-rexglue.bat
-
-rem Copy your own game files here (default.xex plus the rest of the disc):
-rem   Game\MX vs. ATV Alive (USA Europe)\
-
-tools\build-game.bat
-tools\run-game.bat 60
+winget install Kitware.CMake Ninja-build.Ninja LLVM.LLVM
+winget install Microsoft.VisualStudio.2022.BuildTools --override "--passive --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended"
 ```
 
-The first game build runs codegen and takes a while. The executable is
-`out\build\win-amd64-release\mx_alive.exe`.
+### Passo a passo
 
-See [docs/BUILDING.md](docs/BUILDING.md) for runtime flags, save locations,
-frame-rate presets, measuring FPS, SDK patch details, and troubleshooting.
+```bat
+git clone --recursive https://github.com/<seu-usuario>/<este-repo>.git
+cd <este-repo>
 
-## Repository layout
+rem 1. Compila o rexglue com o patch do autor + a correção da água
+tools\build-rexglue.bat
 
-| Path | Purpose |
+rem 2. Copie os arquivos do SEU jogo (default.xex + o resto do disco) para:
+rem    Game\MX vs. ATV Alive (USA Europe)\
+
+rem 3. Gera o código recompilado e compila o jogo (a primeira vez demora)
+tools\build-game.bat
+
+rem 4. Compila o launcher
+launcher\build-launcher.bat
+```
+
+Depois é só abrir o **`MX Alive Launcher.exe`** e clicar em **JOGAR**.
+
+### DLC
+
+Se você comprou DLCs no seu Xbox 360, copie os pacotes (pasta
+`Content\0000000000000000\5451087B\00000002\`) para o PC e use
+**Instalar DLC...** no launcher. Ele instala em
+`Documentos\mx_alive\0000000000000000\5451087B\00000002\`.
+
+### Dentro do jogo
+
+- **F4**: painel de configurações (cvars ao vivo)
+- **F3**: overlay de debug
+- Para salvar o progresso, volte ao **menu da carreira** depois da prova.
+
+---
+
+## 📊 Status
+
+| Área | Estado |
 |---|---|
-| `src/` | Host app and mid-asm hooks |
-| `mx_alive_manifest.toml` | Codegen manifest: entrypoint, missed function boundaries, hooks |
-| `patches/rexglue-local.patch` | Local changes applied to the pinned SDK |
-| `tools/` | Build, launch, profiling, and crash-symbolization tools |
-| `third_party/rexglue-sdk/` | Pinned rexglue-sdk v0.10.0 submodule |
-| `docs/` | Building, status, credits, and architecture decisions |
-| `generated/` | Codegen output; gitignored and regenerated by the build |
-| `Game/` | Your game files; gitignored and never committed |
+| Boot, menus, vídeos, áudio, save | ✅ |
+| Short Track e Free Ride a 60 FPS | ✅ |
+| **Água e terreno deformável** | ✅ **corrigido aqui** |
+| DLC (pistas, motos, equipamentos) | ✅ 14 pacotes detectados e montados |
+| Controle de PS5, PS4, Switch e genéricos | ✅ |
+| Carreira completa (18 pistas) | 🟡 em teste |
+| Tela dividida, online, 120+ FPS estável | ⬜ ainda não |
+| Modo 2K (`resolution_scale=2`) | ⚠️ evite: pode corromper o save, e a correção da água ainda não cobre a variante com escala |
 
-`generated/rexglue.cmake` is the one tracked file under `generated/`: it is the
-CMake boilerplate that `CMakeLists.txt` includes at configure time.
+Os testes e números originais estão em [docs/STATUS.md](docs/STATUS.md), e o
+README original do gw1337x está em
+[docs/README-original.md](docs/README-original.md).
 
-## How to continue
+## 🤝 Contribuindo
 
-Rough priority order:
+Achou um bug, uma pista que trava ou um efeito estranho? Abra uma issue com o
+log (`out\build\win-amd64-release\logs\`). Pull requests são muito bem-vindos.
+Bons próximos passos:
 
-1. **M3 — finish the single-player sweep.** Enumerate the 12 National,
-   4 Short Track, and 2 Free Ride levels, play each, and log crashes. `.level`
-   loads are logged by the local SDK patch. Return to the career menu after an
-   event so the save is written.
-2. **Fix water corruption** in Free Ride. Compare `readback_resolve=full` with
-   the default eager path, then inspect the water resolve target.
-3. **Fix the Bink save-transition lookup.** Two `midasm_hook`s currently skip
-   the null dereference; the resource-system root cause is still open.
-4. **Harden saves.** The 2K draw-scale preset crashed mid-save and truncated
-   `SAVEGAME`. Reproduce with backups enabled, symbolize the crash site, and
-   decide whether to hard-disable the preset.
-5. **Raise the high-FPS ceiling.** The command processor and two guest threads
-   are CPU-bound around 85–95 fps. The async readback worker removed the
-   largest memcpy cost; next options are coalescing repeated resolves, a
-   shared-memory resolve path, and profiling an async race.
-6. **M4 splitscreen**, then M6 polish/DLC.
-7. **Upstream generic SDK fixes** (async readback worker, FPS telemetry, crash
-   RIP logging) to rexglue if they are still useful.
-
-Tools that make continuation easier:
-
-- `tools\boot-iterate.js` — launch, detect an unregistered indirect call,
-  extend the manifest, and rebuild.
-- `tools\parse-thunks.js <log>` — turn the guest thunk dump into manifest
-  entries.
-- `tools\symbolize.js <rva>` — map a crash RVA to a recompiled function.
-- `tools\thread-sampler.cpp` + `tools\symbolize-rip.js` — RIP sampling and
-  symbolization for performance work.
-- `tools\profile-race.ps1` — per-thread CPU sampling while the game runs.
-
-## Credits
-
-This project stands on rexglue-sdk and Xenia. Full attribution and license
-notes are in [docs/CREDITS.md](docs/CREDITS.md).
-
-- **rexglue-sdk v0.10.0** — Tom Clay and contributors (BSD-3-Clause), with
-  portions derived from the Xenia project (Ben Vanik and contributors).
-- **XenonRecomp** and **rexdex's recompiler** — the static-recompilation
-  lineage rexglue builds on.
-- **Xenia Canary** — compatibility findings for this title (readback resolve
-  and the occlusion-query workaround).
-- **Community reverse-engineering** — XeNTaX BXML notes, `bxml-tool`,
-  `reflex-bxml-editor`, `reflex-package-tool`, and QuickBMS `mx_atv.bms`.
-- **Rainbow Studios / THQ Nordic** — the original game.
+- levar a correção SNORM para `resolve_full_16bpp_scaled`, para os resolves de
+  32/64 bpp (`k_16_16`, `k_16_16_16_16`) e para o backend Vulkan;
+- mandar a correção para o rexglue-sdk e para o Xenia Canary;
+- testar a carreira inteira e as pistas das DLCs.
 
 ## Legal
 
-- This is an independent interoperability and research project. It is not
-  affiliated with or endorsed by Microsoft, Xbox, THQ Nordic, Rainbow Studios,
-  or any middleware vendor.
-- No copyrighted game code, game assets, encryption keys, or generated
-  recompiled code is distributed here. `default.xex` and the game data must
-  come from the user's own copy.
-- “MX vs. ATV” and related marks are trademarks of their respective owners.
-- The recompiled executable produced by the build process is intended for
-  personal use with a legally owned copy of the game.
+- Projeto independente de interoperabilidade e pesquisa, sem afiliação com
+  Microsoft, Xbox, THQ Nordic, Rainbow Studios ou qualquer fornecedor de
+  middleware.
+- **Nenhum código, asset, chave ou código recompilado do jogo é distribuído.**
+  O `default.xex`, os dados e as DLCs têm que vir da sua própria cópia.
+- O executável gerado pela compilação é para uso pessoal com uma cópia
+  adquirida legalmente.
+- "MX vs. ATV" e marcas relacionadas pertencem aos respectivos donos.
 
-## License
+## Licença
 
-BSD-3-Clause. See [LICENSE](LICENSE). The pinned rexglue-sdk submodule retains
-its own BSD-3-Clause license and third-party notices.
+BSD-3-Clause, veja [LICENSE](LICENSE). O submódulo rexglue-sdk mantém a própria
+licença BSD-3-Clause. Os trechos de shader derivados do Xenia seguem a licença
+BSD do Xenia. O `controllers/gamecontrollerdb.txt` vem do
+[SDL_GameControllerDB](https://github.com/mdqinc/SDL_GameControllerDB) (zlib).

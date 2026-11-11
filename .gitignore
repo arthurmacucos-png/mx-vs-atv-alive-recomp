@@ -21,3 +21,8 @@ CLAUDE.md
 docs/agents/
 
 *~
+
+# Local outputs
+
+/launcher.ini
+/*.log

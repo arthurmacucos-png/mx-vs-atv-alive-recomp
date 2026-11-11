@@ -37,6 +37,23 @@ if not errorlevel 1 (
     )
 )
 
+rem Water/terrain spike fix (signed k_16 resolve) + GPU diagnostics.
+rem See patches\water-fix\README.md.
+set "MXPATCH=%ROOT%\patches\rexglue-mx-fixes.patch"
+git -C "%SDK%" apply -p1 --check --ignore-whitespace "%MXPATCH%" >nul 2>&1
+if not errorlevel 1 (
+    echo === applying mx_alive water fix ===
+    git -C "%SDK%" apply -p1 --ignore-whitespace "%MXPATCH%"
+    if errorlevel 1 exit /b 1
+) else (
+    git -C "%SDK%" apply -p1 --check --reverse --ignore-whitespace "%MXPATCH%" >nul 2>&1
+    if errorlevel 1 (
+        echo WARNING: patches\rexglue-mx-fixes.patch could not be applied.
+    ) else (
+        echo === mx_alive water fix already applied ===
+    )
+)
+
 cd /d "%SDK%"
 echo === configuring rexglue (win-amd64) ===
 cmake --preset win-amd64
