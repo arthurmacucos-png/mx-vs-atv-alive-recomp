@@ -160,8 +160,32 @@ namespace MxAliveSetup
         class StepFailed : Exception { public StepFailed(string m) : base(m) { } }
 
         // ---------- process runner ----------
+        // Process.Start resolves a bare name with THIS process's PATH, which is
+        // stale right after winget installs something. Resolve it ourselves.
+        internal static string Which(string file)
+        {
+            if (Path.IsPathRooted(file)) return file;
+            foreach (var dir in FreshPath().Split(';'))
+            {
+                string d = dir.Trim();
+                if (d.Length == 0) continue;
+                foreach (var ext in new[] { "", ".exe", ".cmd", ".bat" })
+                {
+                    try
+                    {
+                        string full = Path.Combine(Environment.ExpandEnvironmentVariables(d), file + ext);
+                        if (ext.Length > 0 || Path.HasExtension(file))
+                            if (File.Exists(full)) return full;
+                    }
+                    catch { }
+                }
+            }
+            return file;
+        }
+
         int Run(string file, string args, string workDir)
         {
+            file = Which(file);
             Log("> " + file + " " + args);
             var psi = new ProcessStartInfo(file, args)
             {
@@ -193,7 +217,7 @@ namespace MxAliveSetup
         {
             foreach (var dir in FreshPath().Split(';'))
             {
-                try { if (dir.Length > 0 && File.Exists(Path.Combine(dir.Trim(), exe + ".exe"))) return true; } catch { }
+                try { if (dir.Trim().Length > 0 && File.Exists(Path.Combine(Environment.ExpandEnvironmentVariables(dir.Trim()), exe + ".exe"))) return true; } catch { }
             }
             return false;
         }
