@@ -46,16 +46,18 @@ namespace MxAliveLauncher
             SetBounds(x, y, w, h);
             BackColor = Theme.Panel;
             DoubleBuffered = true;
+            Font = Theme.Section;
         }
         protected override void OnPaint(PaintEventArgs e)
         {
             base.OnPaint(e);
             using (var pen = new Pen(Theme.Border))
                 e.Graphics.DrawRectangle(pen, 0, 0, Width - 1, Height - 1);
+            float k = Font.Size / Theme.Section.Size;
             using (var b = new SolidBrush(Theme.Accent))
-                e.Graphics.FillRectangle(b, 12, 12, 3, 18);
-            TextRenderer.DrawText(e.Graphics, title.ToUpperInvariant(), Theme.Section,
-                new Point(20, 10), Theme.Text);
+                e.Graphics.FillRectangle(b, 12 * k, 12 * k, Math.Max(3, 3 * k), 18 * k);
+            TextRenderer.DrawText(e.Graphics, title.ToUpperInvariant(), Font,
+                new Point((int)(20 * k), (int)(10 * k)), Theme.Text);
         }
     }
 
@@ -72,7 +74,8 @@ namespace MxAliveLauncher
             var g = e.Graphics;
             g.Clear(Parent != null ? Parent.BackColor : Theme.Panel);
             g.SmoothingMode = SmoothingMode.AntiAlias;
-            int box = 16, y = (Height - box) / 2;
+            int box = Math.Max(12, (int)Math.Round(Font.Height * 0.94)), y = (Height - box) / 2;
+            float q = box / 16f;
             var rect = new Rectangle(1, y, box, box);
             using (var fill = new SolidBrush(Checked ? Theme.Accent : Theme.Field))
                 g.FillRectangle(fill, rect);
@@ -80,7 +83,7 @@ namespace MxAliveLauncher
                 g.DrawRectangle(pen, rect);
             if (Checked)
                 using (var pen = new Pen(Color.White, 2.2f))
-                    g.DrawLines(pen, new[] { new PointF(4.5f, y + 8.5f), new PointF(7.5f, y + 11.5f), new PointF(13.5f, y + 4.5f) });
+                    g.DrawLines(pen, new[] { new PointF(1 + 3.5f * q, y + 8.5f * q), new PointF(1 + 6.5f * q, y + 11.5f * q), new PointF(1 + 12.5f * q, y + 4.5f * q) });
             TextRenderer.DrawText(g, Text, Font, new Point(box + 8, (Height - Font.Height) / 2),
                 Enabled ? ForeColor : Theme.Dim);
         }
@@ -388,10 +391,12 @@ namespace MxAliveLauncher
             BackColor = Theme.Back;
             ForeColor = Theme.Text;
             Font = Theme.Base;
-            FormBorderStyle = FormBorderStyle.FixedSingle;
-            MaximizeBox = false;
+            FormBorderStyle = FormBorderStyle.Sizable;
             StartPosition = FormStartPosition.CenterScreen;
             ClientSize = new Size(920, 930);
+            MinimumSize = new Size(820, 780);
+            WindowState = FormWindowState.Maximized;
+            KeyPreview = true;
             AutoScaleMode = AutoScaleMode.Dpi;
             try { Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath); } catch { }
 
@@ -402,6 +407,7 @@ namespace MxAliveLauncher
             BuildAdvanced();
             BuildTools();
             BuildBottom();
+            WrapInScalableContent();
 
             LoadSettings();
             EventHandler syncMnk = delegate { mnkMouse.Enabled = sensitivity.Enabled = mnk.Checked; };
@@ -423,8 +429,80 @@ namespace MxAliveLauncher
             FormClosing += delegate { SaveSettings(); };
         }
 
+        // ---------- scaling (fullscreen / any window size) ----------
+        // The layout is designed at 920x930. Everything lives in one panel that
+        // is scaled uniformly to fit the window and kept centered.
+        Panel content;
+        float currentScale = 1f;
+        Size designSize;
+        readonly Dictionary<Control, float> baseFontSizes = new Dictionary<Control, float>();
+
+        void WrapInScalableContent()
+        {
+            content = new Panel { BackColor = Theme.Back, Size = ClientSize, Location = Point.Empty };
+            var children = Controls.Cast<Control>().ToList();
+            foreach (var c in children) content.Controls.Add(c);
+            Controls.Add(content);
+            designSize = content.Size;
+            RememberFonts(content);
+            Resize += delegate { Rescale(); };
+            Shown += delegate { Rescale(); };
+            KeyDown += (s, e) => { if (e.KeyCode == Keys.F11) ToggleFullscreen(); };
+        }
+
+        void RememberFonts(Control parent)
+        {
+            foreach (Control c in parent.Controls)
+            {
+                baseFontSizes[c] = c.Font.Size;
+                RememberFonts(c);
+            }
+        }
+
+        void Rescale()
+        {
+            if (content == null || ClientSize.Width < 50 || ClientSize.Height < 50) return;
+            float target = Math.Min(ClientSize.Width / (float)designSize.Width,
+                                    ClientSize.Height / (float)designSize.Height);
+            target = Math.Max(0.55f, Math.Min(3f, target));
+            if (Math.Abs(target - currentScale) > 0.005f)
+            {
+                SuspendLayout();
+                content.SuspendLayout();
+                content.Scale(new SizeF(target / currentScale, target / currentScale));
+                foreach (var kv in baseFontSizes)
+                {
+                    var f = kv.Key.Font;
+                    kv.Key.Font = new Font(f.FontFamily, kv.Value * target, f.Style);
+                }
+                currentScale = target;
+                content.ResumeLayout();
+                ResumeLayout();
+                content.Invalidate(true);
+            }
+            content.Location = new Point(Math.Max(0, (ClientSize.Width - content.Width) / 2),
+                                         Math.Max(0, (ClientSize.Height - content.Height) / 2));
+        }
+
+        FormWindowState stateBeforeFullscreen = FormWindowState.Maximized;
+        void ToggleFullscreen()
+        {
+            if (FormBorderStyle == FormBorderStyle.None)
+            {
+                FormBorderStyle = FormBorderStyle.Sizable;
+                WindowState = stateBeforeFullscreen;
+            }
+            else
+            {
+                stateBeforeFullscreen = WindowState;
+                WindowState = FormWindowState.Normal;
+                FormBorderStyle = FormBorderStyle.None;
+                WindowState = FormWindowState.Maximized;
+            }
+        }
+
         // ---------- layout helpers ----------
-        static Label MakeLabel(Control parent, string text, int x, int y, int w = 150)
+        static Label MakeLabel(Control parent, string text, int x, int y, int w = 152)
         {
             var l = new Label { Text = text, ForeColor = Theme.Text, BackColor = Color.Transparent, AutoSize = false };
             l.SetBounds(x, y + 3, w, 20);
@@ -483,11 +561,12 @@ namespace MxAliveLauncher
             header.SetBounds(0, 0, 920, 150);
             header.Paint += (s, e) =>
             {
-                using (var b = new SolidBrush(Theme.Accent)) e.Graphics.FillRectangle(b, 0, 147, 920, 3);
+                var hp = (Control)s;
+                using (var b = new SolidBrush(Theme.Accent)) e.Graphics.FillRectangle(b, 0, hp.Height - 3, hp.Width, 3);
             };
             Controls.Add(header);
 
-            banner = new PictureBox { SizeMode = PictureBoxSizeMode.CenterImage, BackColor = Color.Black };
+            banner = new PictureBox { SizeMode = PictureBoxSizeMode.Zoom, BackColor = Color.Black };
             banner.SetBounds(16, 13, 160, 122);
             header.Controls.Add(banner);
 
@@ -510,7 +589,7 @@ namespace MxAliveLauncher
             gameDir = new TextBox { BackColor = Theme.Field, ForeColor = Theme.Text, BorderStyle = BorderStyle.FixedSingle };
             gameDir.SetBounds(16, 62, 316, 24);
             s.Controls.Add(gameDir);
-            var browse = MakeButton(s, "Procurar...", 338, 61, 82, 26);
+            var browse = MakeButton(s, "Procurar", 338, 61, 82, 26);
             browse.Click += delegate
             {
                 using (var d = new FolderBrowserDialog { Description = "Escolha a pasta do jogo (a que tem o default.xex)", SelectedPath = gameDir.Text })
@@ -571,7 +650,7 @@ namespace MxAliveLauncher
                 "60 FPS é o modo testado e estável. Acima disso as corridas ficam\n" +
                 "entre 85 e 95 FPS (limite do processador). 1080p é um modo nativo\n" +
                 "do Xbox 360. O modo 2K foi removido de propósito: ele corrompe o save.",
-                16, 206, 410, 56);
+                16, 204, 410, 62);
         }
 
         void BuildControls()
@@ -591,7 +670,7 @@ namespace MxAliveLauncher
                 new Option("XInput - só controle de Xbox", "xinput"));
             mnk = MakeCheck(s, "Teclado e mouse", 16, 182, 190);
             mnkMouse = MakeCheck(s, "Mouse move a câmera", 220, 182, 200);
-            MakeLabel(s, "Sensibilidade do mouse", 16, 216);
+            MakeLabel(s, "Sensibilidade", 16, 216, 154);
             sensitivity = new NumericUpDown { DecimalPlaces = 1, Increment = 0.1m, Minimum = 0.1m, Maximum = 5m, Value = 1m, BackColor = Theme.Field, ForeColor = Theme.Text, BorderStyle = BorderStyle.FixedSingle };
             sensitivity.SetBounds(170, 216, 80, 24);
             s.Controls.Add(sensitivity);
@@ -620,16 +699,16 @@ namespace MxAliveLauncher
             var s = new Section("Arquivos", 16, 684, 888, 64);
             Controls.Add(s);
             int x = 128;
-            var b1 = MakeButton(s, "Abrir logs", x, 18, 110); x += 118;
+            var b1 = MakeButton(s, "Abrir logs", x, 14, 110, 36); x += 118;
             b1.Click += delegate { OpenFolder(Path.Combine(root, @"out\build\win-amd64-release\logs")); };
-            var b2 = MakeButton(s, "Abrir saves", x, 18, 110); x += 118;
+            var b2 = MakeButton(s, "Abrir saves", x, 14, 110, 36); x += 118;
             b2.Click += delegate { OpenFolder(saveRoot); };
-            var b3 = MakeButton(s, "Backup agora", x, 18, 120); x += 128;
+            var b3 = MakeButton(s, "Backup agora", x, 14, 120, 36); x += 128;
             b3.Click += delegate { string d = BackupSave(); Log(d == null ? "Nada para copiar ainda (nenhum save)." : "Backup criado: " + d); };
-            installDlc = MakeButton(s, "Instalar DLC...", x, 18, 130); x += 138;
+            installDlc = MakeButton(s, "Instalar DLC...", x, 14, 130, 36); x += 138;
             installDlc.FlatAppearance.BorderColor = Theme.Accent;
             installDlc.Click += delegate { InstallDlcDialog(); };
-            var b4 = MakeButton(s, "Atalho na Área de Trabalho", x, 18, 200);
+            var b4 = MakeButton(s, "Criar atalho", x, 14, 200, 36);
             b4.Click += delegate { CreateShortcut(); };
         }
 
