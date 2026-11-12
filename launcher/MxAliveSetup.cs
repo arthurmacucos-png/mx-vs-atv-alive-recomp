@@ -65,9 +65,13 @@ namespace MxAliveSetup
             Text = "MX vs. ATV Alive - instalação";
             BackColor = Theme.Back; ForeColor = Theme.Text;
             Font = new Font("Segoe UI", 9.5f);
-            FormBorderStyle = FormBorderStyle.FixedSingle; MaximizeBox = false;
+            // Resizable: on a TV / small screen / high Windows scaling the 760x720
+            // design does not fit. Everything is scaled to the window (see Rescale).
+            FormBorderStyle = FormBorderStyle.Sizable; MaximizeBox = true;
             StartPosition = FormStartPosition.CenterScreen;
             ClientSize = new Size(760, 720);
+            MinimumSize = new Size(420, 400);
+            KeyPreview = true;
             try { Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath); } catch { }
 
             var title = new Label { Text = "MX vs. ATV Alive", Font = new Font("Segoe UI Semibold", 20f), ForeColor = Theme.Accent, AutoSize = true, Location = new Point(20, 14) };
@@ -102,12 +106,115 @@ namespace MxAliveSetup
             install.FlatAppearance.BorderColor = Theme.Accent;
             install.Click += delegate { Start(); };
             Controls.Add(install);
-            var note = new Label { Text = "Precisa de internet e cerca de 15 GB livres. Pode pedir permissão de administrador.", ForeColor = Theme.Dim, Font = new Font("Segoe UI", 8.5f), Location = new Point(240, 672), Size = new Size(500, 20) };
+            var note = new Label { Text = "Precisa de internet e cerca de 15 GB livres. Pode pedir permissão de administrador.\nTamanho: arraste a borda, maximize, F11 = tela cheia, Ctrl + / Ctrl - = zoom.", ForeColor = Theme.Dim, Font = new Font("Segoe UI", 8.5f), Location = new Point(240, 662), Size = new Size(500, 40) };
             Controls.Add(note);
+            AcceptButton = install;
 
             // Running from inside an extracted project: offer that folder.
             string here = Path.GetDirectoryName(Application.ExecutablePath);
             if (File.Exists(Path.Combine(here, @"tools\build-game.bat"))) installDir.Text = here;
+
+            WrapInScalableContent();
+            Load += delegate { FitToScreen(); };
+        }
+
+        // ---------- scaling (any window size / TV / fullscreen) ----------
+        // The layout is designed at 760x720. Everything lives in one panel that is
+        // scaled uniformly to fit the window and kept centered (same as the launcher).
+        Panel content;
+        float currentScale = 1f, zoom = 1f;
+        Size designSize;
+        readonly Dictionary<Control, float> baseFontSizes = new Dictionary<Control, float>();
+
+        void WrapInScalableContent()
+        {
+            content = new Panel { BackColor = Theme.Back, Size = ClientSize, Location = Point.Empty };
+            var children = Controls.Cast<Control>().ToList();
+            foreach (var c in children) content.Controls.Add(c);
+            Controls.Add(content);
+            designSize = content.Size;
+            RememberFonts(content);
+            Resize += delegate { Rescale(); };
+            Shown += delegate { Rescale(); };
+            KeyDown += (s, e) =>
+            {
+                if (e.KeyCode == Keys.F11) { ToggleFullscreen(); e.Handled = true; }
+                else if (e.Control && (e.KeyCode == Keys.Oemplus || e.KeyCode == Keys.Add)) { SetZoom(zoom + 0.1f); e.Handled = true; }
+                else if (e.Control && (e.KeyCode == Keys.OemMinus || e.KeyCode == Keys.Subtract)) { SetZoom(zoom - 0.1f); e.Handled = true; }
+                else if (e.Control && (e.KeyCode == Keys.D0 || e.KeyCode == Keys.NumPad0)) { SetZoom(1f); e.Handled = true; }
+            };
+        }
+
+        void RememberFonts(Control parent)
+        {
+            foreach (Control c in parent.Controls)
+            {
+                baseFontSizes[c] = c.Font.Size;
+                RememberFonts(c);
+            }
+        }
+
+        // Start no bigger than the screen (taskbar excluded), keeping the proportions.
+        void FitToScreen()
+        {
+            Rectangle wa = Screen.FromPoint(Cursor.Position).WorkingArea;
+            Size chrome = Size - ClientSize;
+            int maxW = (int)(wa.Width * 0.95f) - chrome.Width, maxH = (int)(wa.Height * 0.95f) - chrome.Height;
+            if (ClientSize.Width <= maxW && ClientSize.Height <= maxH) return;
+            float k = Math.Min(maxW / (float)designSize.Width, maxH / (float)designSize.Height);
+            MinimumSize = new Size(Math.Min(MinimumSize.Width, wa.Width), Math.Min(MinimumSize.Height, wa.Height));
+            ClientSize = new Size(Math.Max(200, (int)(designSize.Width * k)), Math.Max(200, (int)(designSize.Height * k)));
+            Location = new Point(wa.Left + (wa.Width - Width) / 2, wa.Top + (wa.Height - Height) / 2);
+        }
+
+        void SetZoom(float z)
+        {
+            zoom = Math.Max(0.5f, Math.Min(1.5f, z));
+            Rescale();
+        }
+
+        void Rescale()
+        {
+            if (content == null || ClientSize.Width < 50 || ClientSize.Height < 50) return;
+            float target = Math.Min(ClientSize.Width / (float)designSize.Width,
+                                    ClientSize.Height / (float)designSize.Height) * zoom;
+            target = Math.Max(0.4f, Math.Min(3f, target));
+            if (Math.Abs(target - currentScale) > 0.005f)
+            {
+                SuspendLayout();
+                content.SuspendLayout();
+                content.Scale(new SizeF(target / currentScale, target / currentScale));
+                foreach (var kv in baseFontSizes)
+                {
+                    var f = kv.Key.Font;
+                    kv.Key.Font = new Font(f.FontFamily, kv.Value * target, f.Style);
+                }
+                currentScale = target;
+                content.ResumeLayout();
+                ResumeLayout();
+                content.Invalidate(true);
+            }
+            // Zoomed in past the window: scroll instead of cutting things off.
+            AutoScroll = content.Width > ClientSize.Width || content.Height > ClientSize.Height;
+            content.Location = new Point(Math.Max(0, (ClientSize.Width - content.Width) / 2) + AutoScrollPosition.X,
+                                         Math.Max(0, (ClientSize.Height - content.Height) / 2) + AutoScrollPosition.Y);
+        }
+
+        FormWindowState stateBeforeFullscreen = FormWindowState.Normal;
+        void ToggleFullscreen()
+        {
+            if (FormBorderStyle == FormBorderStyle.None)
+            {
+                FormBorderStyle = FormBorderStyle.Sizable;
+                WindowState = stateBeforeFullscreen;
+            }
+            else
+            {
+                stateBeforeFullscreen = WindowState;
+                WindowState = FormWindowState.Normal;
+                FormBorderStyle = FormBorderStyle.None;
+                WindowState = FormWindowState.Maximized;
+            }
         }
 
         static string DefaultInstallDir()
