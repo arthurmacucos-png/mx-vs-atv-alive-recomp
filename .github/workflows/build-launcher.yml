@@ -6,7 +6,7 @@ name: Build launcher and setup
 on:
   push:
     branches: [main]
-    paths: ['launcher/**']
+    paths: ['launcher/**', 'MX Alive Setup.bat', '.github/workflows/build-launcher.yml']
   workflow_dispatch:
 
 permissions:
@@ -35,3 +35,21 @@ jobs:
           path: |
             MX Alive Setup.exe
             MX Alive Launcher.exe
+
+  # Checks that "MX Alive Setup.bat" (download + compile on the user's PC)
+  # still works on a clean Windows.
+  test-bat:
+    needs: build
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run MX Alive Setup.bat
+        shell: cmd
+        run: call "MX Alive Setup.bat" < NUL
+      - name: Check the compiled setup
+        shell: pwsh
+        run: |
+          $exe = Join-Path $env:LOCALAPPDATA 'MXAliveSetup\MX Alive Setup.exe'
+          if (-not (Test-Path $exe)) { throw "not built: $exe" }
+          Get-Item $exe | Format-List FullName, Length
+          Get-Process | Where-Object { $_.Path -eq $exe } | Stop-Process -Force

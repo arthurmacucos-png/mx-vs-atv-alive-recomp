@@ -68,7 +68,8 @@ cópia, e sim a conversão.
 
 ## 🚀 Instalação fácil (um clique)
 
-1. Baixe o **`MX Alive Setup.exe`** (em **Releases**, ou aqui no repositório).
+1. Baixe o **`MX Alive Setup.bat`** (aqui no repositório) e dê dois cliques. Ele compila o instalador no seu PC e abre a janela.
+   (O `MX Alive Setup.exe` pronto também funciona, mas o antivírus pode apagá-lo por não ter assinatura digital.)
 2. Abra, escolha a pasta da **sua** cópia do jogo de Xbox 360 (a que tem o
    `default.xex`) e clique em **INSTALAR**.
 
