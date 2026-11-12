@@ -15,6 +15,17 @@ using System.Net;
 using System.Text;
 using System.Threading;
 using System.Windows.Forms;
+using System.Reflection;
+
+// File details shown in Windows (Properties > Details). An .exe without them
+// is much more likely to be flagged by antivirus heuristics.
+[assembly: AssemblyTitle("MX vs. ATV Alive - Setup")]
+[assembly: AssemblyDescription("Instalador do port nativo para PC do MX vs. ATV Alive (usa a sua propria copia do jogo)")]
+[assembly: AssemblyProduct("MX vs. ATV Alive Recomp")]
+[assembly: AssemblyCompany("mx-vs-atv-alive-recomp")]
+[assembly: AssemblyCopyright("Codigo aberto - github.com/arthurmacucos-png/mx-vs-atv-alive-recomp")]
+[assembly: AssemblyVersion("1.1.0.0")]
+[assembly: AssemblyFileVersion("1.1.0.0")]
 
 namespace MxAliveSetup
 {
