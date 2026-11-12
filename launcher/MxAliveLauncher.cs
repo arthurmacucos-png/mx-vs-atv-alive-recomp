@@ -394,7 +394,9 @@ namespace MxAliveLauncher
             FormBorderStyle = FormBorderStyle.Sizable;
             StartPosition = FormStartPosition.CenterScreen;
             ClientSize = new Size(920, 930);
-            MinimumSize = new Size(820, 780);
+            // Small minimum: on a TV / small screen / high Windows scaling 820x780
+            // did not fit. The layout scales down (see Rescale).
+            MinimumSize = new Size(480, 480);
             WindowState = FormWindowState.Maximized;
             KeyPreview = true;
             AutoScaleMode = AutoScaleMode.Dpi;
@@ -408,6 +410,7 @@ namespace MxAliveLauncher
             BuildTools();
             BuildBottom();
             WrapInScalableContent();
+            Load += delegate { FitRestoredSizeToScreen(); };
 
             LoadSettings();
             EventHandler syncMnk = delegate { mnkMouse.Enabled = sensitivity.Enabled = mnk.Checked; };
@@ -464,7 +467,7 @@ namespace MxAliveLauncher
             if (content == null || ClientSize.Width < 50 || ClientSize.Height < 50) return;
             float target = Math.Min(ClientSize.Width / (float)designSize.Width,
                                     ClientSize.Height / (float)designSize.Height);
-            target = Math.Max(0.55f, Math.Min(3f, target));
+            target = Math.Max(0.4f, Math.Min(3f, target));
             if (Math.Abs(target - currentScale) > 0.005f)
             {
                 SuspendLayout();
@@ -482,6 +485,18 @@ namespace MxAliveLauncher
             }
             content.Location = new Point(Math.Max(0, (ClientSize.Width - content.Width) / 2),
                                          Math.Max(0, (ClientSize.Height - content.Height) / 2));
+        }
+
+        // The window opens maximized; make sure "restore down" also fits the screen.
+        void FitRestoredSizeToScreen()
+        {
+            Rectangle wa = Screen.FromPoint(Cursor.Position).WorkingArea;
+            int w = Math.Min(Width, (int)(wa.Width * 0.95f)), h = Math.Min(Height, (int)(wa.Height * 0.95f));
+            MinimumSize = new Size(Math.Min(MinimumSize.Width, wa.Width), Math.Min(MinimumSize.Height, wa.Height));
+            if (w == Width && h == Height) return;
+            var b = new Rectangle(wa.Left + (wa.Width - w) / 2, wa.Top + (wa.Height - h) / 2, w, h);
+            if (WindowState == FormWindowState.Normal) Bounds = b;
+            else { WindowState = FormWindowState.Normal; Bounds = b; WindowState = FormWindowState.Maximized; }
         }
 
         FormWindowState stateBeforeFullscreen = FormWindowState.Maximized;
