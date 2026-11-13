@@ -121,7 +121,7 @@ namespace MxAliveSetup
             updateOnly.FlatAppearance.BorderColor = Theme.Accent;
             updateOnly.Click += delegate { UpdateOnlyClicked(); };
             Controls.Add(updateOnly);
-            var note = new Label { Text = "Precisa de internet e ~15 GB livres. Pode pedir permissão de administrador.\nSÓ ATUALIZAR: baixa só os arquivos novos, sem mexer no jogo e nos saves.\nF11 = tela cheia, Ctrl + / Ctrl - = zoom.", ForeColor = Theme.Dim, Font = new Font("Segoe UI", 8f), Location = new Point(418, 652), Size = new Size(330, 56) };
+            var note = new Label { Text = "SÓ ATUALIZAR: baixa só o que mudou, sem mexer no jogo e nos saves.\nInternet e ~15 GB livres. F11 = tela cheia.", ForeColor = Theme.Dim, Font = new Font("Segoe UI", 8f), Location = new Point(418, 652), Size = new Size(330, 56) };
             Controls.Add(note);
             AcceptButton = install;
 
