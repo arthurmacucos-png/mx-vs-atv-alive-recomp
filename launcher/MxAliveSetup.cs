@@ -67,7 +67,7 @@ namespace MxAliveSetup
         TextBox installDir, gameDir, log;
         Label status;
         ProgressBar bar;
-        Button install, browseInstall, browseGame;
+        Button install, updateOnly, browseInstall, browseGame;
         StreamWriter logFile;
         string logPath;
 
@@ -117,13 +117,23 @@ namespace MxAliveSetup
             install.FlatAppearance.BorderColor = Theme.Accent;
             install.Click += delegate { Start(); };
             Controls.Add(install);
-            var note = new Label { Text = "Precisa de internet e cerca de 15 GB livres. Pode pedir permissão de administrador.\nTamanho: arraste a borda, maximize, F11 = tela cheia, Ctrl + / Ctrl - = zoom.", ForeColor = Theme.Dim, Font = new Font("Segoe UI", 8.5f), Location = new Point(240, 662), Size = new Size(500, 40) };
+            updateOnly = new Button { Text = "SÓ ATUALIZAR", Font = new Font("Segoe UI Semibold", 11f), FlatStyle = FlatStyle.Flat, BackColor = Theme.Field, ForeColor = Theme.Accent, Location = new Point(236, 656), Size = new Size(170, 46), Cursor = Cursors.Hand };
+            updateOnly.FlatAppearance.BorderColor = Theme.Accent;
+            updateOnly.Click += delegate { UpdateOnlyClicked(); };
+            Controls.Add(updateOnly);
+            var note = new Label { Text = "Precisa de internet e ~15 GB livres. Pode pedir permissão de administrador.\nSÓ ATUALIZAR: baixa só os arquivos novos, sem mexer no jogo e nos saves.\nF11 = tela cheia, Ctrl + / Ctrl - = zoom.", ForeColor = Theme.Dim, Font = new Font("Segoe UI", 8f), Location = new Point(418, 652), Size = new Size(330, 56) };
             Controls.Add(note);
             AcceptButton = install;
 
             // Running from inside an extracted project: offer that folder.
             string here = Path.GetDirectoryName(Application.ExecutablePath);
             if (File.Exists(Path.Combine(here, @"tools\build-game.bat"))) installDir.Text = here;
+            // Existing install somewhere common: preselect it (button becomes ATUALIZAR).
+            if (!IsInstalled(installDir.Text.Trim()))
+            {
+                string found = FindInstall();
+                if (found != null) installDir.Text = found;
+            }
 
             installDir.TextChanged += delegate { RefreshMode(); };
             RefreshMode();
@@ -240,6 +250,65 @@ namespace MxAliveSetup
             "Atualizar o atalho"
         };
 
+        // Looks for an existing install in the usual places (shallow, fast).
+        static string FindInstall()
+        {
+            var roots = new List<string>();
+            roots.Add(Path.GetDirectoryName(Application.ExecutablePath));
+            foreach (var d in DriveInfo.GetDrives())
+            {
+                try { if (d.DriveType == DriveType.Fixed && d.IsReady) roots.Add(Path.Combine(d.RootDirectory.FullName, "Jogos")); } catch { }
+            }
+            string user = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            roots.Add(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory));
+            roots.Add(Path.Combine(user, "Desktop"));
+            roots.Add(Path.Combine(user, @"OneDrive\Desktop"));
+            roots.Add(Path.Combine(user, @"OneDrive\Área de Trabalho"));
+            roots.Add(Path.Combine(user, "Downloads"));
+            roots.Add(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments));
+            foreach (var r in roots.Distinct(StringComparer.OrdinalIgnoreCase))
+            {
+                try
+                {
+                    if (!Directory.Exists(r)) continue;
+                    if (IsInstalled(r)) return r;
+                    foreach (var d1 in Directory.GetDirectories(r))
+                    {
+                        if (IsInstalled(d1)) return d1;
+                        try { foreach (var d2 in Directory.GetDirectories(d1)) if (IsInstalled(d2)) return d2; } catch { }
+                    }
+                }
+                catch { }
+            }
+            return null;
+        }
+
+        void UpdateOnlyClicked()
+        {
+            string root = installDir.Text.Trim();
+            if (!IsInstalled(root))
+            {
+                string found = FindInstall();
+                if (found == null)
+                {
+                    using (var d = new FolderBrowserDialog { Description = "Escolha a pasta onde o MX vs. ATV Alive já está instalado (a que tem o MX Alive Launcher.exe)" })
+                    {
+                        if (d.ShowDialog(this) != DialogResult.OK) return;
+                        found = d.SelectedPath;
+                    }
+                }
+                if (!IsInstalled(found))
+                {
+                    MessageBox.Show(this, "Não encontrei uma instalação completa em:\n" + found +
+                        "\n\nPara atualizar, a pasta precisa ter o jogo já compilado (out\\build\\win-amd64-release\\mx_alive.exe). " +
+                        "Se a instalação nunca terminou, use INSTALAR.", "Atualizar", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return;
+                }
+                installDir.Text = found;
+            }
+            Start();
+        }
+
         static bool IsInstalled(string root)
         {
             return File.Exists(Path.Combine(root, @"tools\build-game.bat")) &&
@@ -251,6 +320,7 @@ namespace MxAliveSetup
             if (install == null) return;
             updateMode = IsInstalled(installDir.Text.Trim());
             install.Text = updateMode ? "ATUALIZAR" : "INSTALAR";
+            if (updateOnly != null) updateOnly.Visible = !updateMode;
             gameDir.Enabled = browseGame.Enabled = !updateMode;
             var names = updateMode ? updateStepNames : stepNames;
             for (int i = 0; i < stepLabels.Count; i++)
@@ -411,6 +481,7 @@ namespace MxAliveSetup
             }
 
             install.Enabled = browseGame.Enabled = browseInstall.Enabled = false;
+            updateOnly.Visible = false;
             installDir.ReadOnly = gameDir.ReadOnly = true;
             Directory.CreateDirectory(root);
             logPath = Path.Combine(root, "setup.log");
