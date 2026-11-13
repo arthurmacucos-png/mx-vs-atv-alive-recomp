@@ -617,7 +617,6 @@ namespace MxAliveLauncher
             MakeLabel(s, "Idioma", 16, 114);
             language = MakeCombo(s, 170, 114, 250,
                 new Option("English", "1"),
-                new Option("Português (se o jogo tiver)", "9"),
                 new Option("Español", "5"),
                 new Option("Français", "4"),
                 new Option("Deutsch", "3"),
@@ -723,8 +722,11 @@ namespace MxAliveLauncher
             installDlc = MakeButton(s, "Instalar DLC...", x, 14, 130, 36); x += 138;
             installDlc.FlatAppearance.BorderColor = Theme.Accent;
             installDlc.Click += delegate { InstallDlcDialog(); };
-            var b4 = MakeButton(s, "Criar atalho", x, 14, 200, 36);
+            var b4 = MakeButton(s, "Criar atalho", x, 14, 118, 36); x += 126;
             b4.Click += delegate { CreateShortcut(); };
+            var b5 = MakeButton(s, "Gerar relatório", x, 14, 132, 36);
+            b5.FlatAppearance.BorderColor = Theme.Accent;
+            b5.Click += delegate { MakeReport(); };
         }
 
         void BuildBottom()
@@ -1276,6 +1278,77 @@ namespace MxAliveLauncher
                 Process.Start("explorer.exe", Q(path));
             }
             catch (Exception ex) { Log("Não consegui abrir a pasta: " + ex.Message); }
+        }
+
+        // Zip with logs + system info on the Desktop, to send when something breaks.
+        void MakeReport()
+        {
+            try
+            {
+                SaveSettings();
+                string desktop = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
+                string zipPath = Path.Combine(desktop, "MX-Alive-relatorio-" + DateTime.Now.ToString("yyyyMMdd-HHmm") + ".zip");
+                if (File.Exists(zipPath)) File.Delete(zipPath);
+                using (var zip = System.IO.Compression.ZipFile.Open(zipPath, System.IO.Compression.ZipArchiveMode.Create))
+                {
+                    var info = new StringBuilder();
+                    info.AppendLine("MX vs. ATV Alive - relatório  " + DateTime.Now);
+                    info.AppendLine("Launcher v" + Version + "  |  pasta: " + root);
+                    info.Append(Wmi("Win32_OperatingSystem", "Caption,Version,BuildNumber,OSArchitecture"));
+                    info.AppendLine("Jogo: " + ReadXexInfo(Path.Combine(gameDir.Text.Trim(), "default.xex")));
+                    info.AppendLine();
+                    info.Append(Wmi("Win32_VideoController", "Name,DriverVersion,DriverDate,AdapterRAM,CurrentHorizontalResolution,CurrentVerticalResolution,CurrentRefreshRate"));
+                    info.Append(Wmi("Win32_Processor", "Name,NumberOfCores,NumberOfLogicalProcessors,MaxClockSpeed"));
+                    info.Append(Wmi("Win32_ComputerSystem", "TotalPhysicalMemory"));
+                    info.AppendLine("Controles:");
+                    foreach (var c in controllers.Items) info.AppendLine("  " + c);
+                    info.AppendLine();
+                    info.AppendLine("Arquivos do port:");
+                    string outDir = Path.Combine(root, @"out\build\win-amd64-release");
+                    foreach (var f in new[] { "mx_alive.exe", "rexgpu-xenos.dll", "rexruntime.dll" })
+                    {
+                        var fi = new FileInfo(Path.Combine(outDir, f));
+                        info.AppendLine("  " + f + ": " + (fi.Exists ? fi.Length + " bytes, " + fi.LastWriteTime : "AUSENTE"));
+                    }
+                    info.AppendLine("  DLC instaladas: " + string.Join(", ", InstalledDlcNames().ToArray()));
+                    var e1 = zip.CreateEntry("sistema.txt");
+                    using (var w = new StreamWriter(e1.Open(), Encoding.UTF8)) w.Write(info.ToString());
+
+                    var files = new List<string>();
+                    var logs = new DirectoryInfo(Path.Combine(outDir, "logs"));
+                    if (logs.Exists)
+                        files.AddRange(logs.GetFiles("*.log").OrderByDescending(f => f.LastWriteTime).Take(4).Select(f => f.FullName));
+                    foreach (var f in new[] { Path.Combine(root, "launcher.ini"), Path.Combine(root, "setup.log") })
+                        if (File.Exists(f)) files.Add(f);
+                    foreach (var f in files)
+                    {
+                        var entry = zip.CreateEntry(Path.GetFileName(f), System.IO.Compression.CompressionLevel.Optimal);
+                        using (var src = new FileStream(f, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
+                        using (var dst = entry.Open()) src.CopyTo(dst);
+                    }
+                }
+                Log("Relatório criado na Área de Trabalho: " + Path.GetFileName(zipPath));
+                Process.Start("explorer.exe", "/select,\"" + zipPath + "\"");
+            }
+            catch (Exception ex) { Log("Não consegui gerar o relatório: " + ex.Message); }
+        }
+
+        static string Wmi(string cls, string props)
+        {
+            var sb = new StringBuilder();
+            try
+            {
+                using (var searcher = new System.Management.ManagementObjectSearcher("SELECT " + props + " FROM " + cls))
+                    foreach (System.Management.ManagementObject o in searcher.Get())
+                    {
+                        sb.AppendLine(cls + ":");
+                        foreach (var name in props.Split(','))
+                            sb.AppendLine("  " + name + " = " + o[name]);
+                    }
+            }
+            catch (Exception ex) { sb.AppendLine(cls + ": erro " + ex.Message); }
+            sb.AppendLine();
+            return sb.ToString();
         }
 
         void CreateShortcut()

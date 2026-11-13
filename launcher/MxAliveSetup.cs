@@ -125,6 +125,8 @@ namespace MxAliveSetup
             string here = Path.GetDirectoryName(Application.ExecutablePath);
             if (File.Exists(Path.Combine(here, @"tools\build-game.bat"))) installDir.Text = here;
 
+            installDir.TextChanged += delegate { RefreshMode(); };
+            RefreshMode();
             WrapInScalableContent();
             Load += delegate { FitToScreen(); };
         }
@@ -228,6 +230,43 @@ namespace MxAliveSetup
             }
         }
 
+        // ---------- update mode ----------
+        bool updateMode;
+        readonly string[] updateStepNames = {
+            "Baixar a atualização do GitHub",
+            "Preparar o rexglue para as novas correções",
+            "Recompilar o módulo gráfico",
+            "Instalar as DLLs novas no jogo",
+            "Atualizar o atalho"
+        };
+
+        static bool IsInstalled(string root)
+        {
+            return File.Exists(Path.Combine(root, @"tools\build-game.bat")) &&
+                   File.Exists(Path.Combine(root, @"out\build\win-amd64-release\mx_alive.exe"));
+        }
+
+        void RefreshMode()
+        {
+            if (install == null) return;
+            updateMode = IsInstalled(installDir.Text.Trim());
+            install.Text = updateMode ? "ATUALIZAR" : "INSTALAR";
+            gameDir.Enabled = browseGame.Enabled = !updateMode;
+            var names = updateMode ? updateStepNames : stepNames;
+            for (int i = 0; i < stepLabels.Count; i++)
+            {
+                stepLabels[i].Visible = stepIcons[i].Visible = i < names.Length;
+                if (i < names.Length)
+                {
+                    stepLabels[i].Text = names[i]; stepLabels[i].ForeColor = Theme.Dim;
+                    stepIcons[i].Text = "•"; stepIcons[i].ForeColor = Theme.Dim;
+                }
+            }
+            status.Text = updateMode
+                ? "Instalação encontrada. Clique em ATUALIZAR (o jogo e os saves não são alterados)."
+                : "Escolha a pasta do jogo e clique em INSTALAR.";
+        }
+
         static string DefaultInstallDir()
         {
             string drive = Path.GetPathRoot(Environment.GetFolderPath(Environment.SpecialFolder.Windows));
@@ -268,9 +307,9 @@ namespace MxAliveSetup
             Ui(() =>
             {
                 var icon = stepIcons[i]; var lbl = stepLabels[i];
-                if (state == "run") { icon.Text = "►"; icon.ForeColor = Theme.Accent; lbl.ForeColor = Theme.Text; status.Text = stepNames[i] + "..."; bar.Value = Math.Min(bar.Maximum, i * 10 + 2); }
+                if (state == "run") { icon.Text = "►"; icon.ForeColor = Theme.Accent; lbl.ForeColor = Theme.Text; status.Text = lbl.Text + "..."; bar.Value = Math.Min(bar.Maximum, i * 10 + 2); }
                 else if (state == "ok") { icon.Text = "✓"; icon.ForeColor = Theme.Good; lbl.ForeColor = Theme.Text; bar.Value = Math.Min(bar.Maximum, (i + 1) * 10); }
-                else if (state == "skip") { icon.Text = "✓"; icon.ForeColor = Theme.Dim; lbl.Text = stepNames[i] + "  (já estava pronto)"; bar.Value = Math.Min(bar.Maximum, (i + 1) * 10); }
+                else if (state == "skip") { icon.Text = "✓"; icon.ForeColor = Theme.Dim; lbl.Text = lbl.Text + "  (já estava pronto)"; bar.Value = Math.Min(bar.Maximum, (i + 1) * 10); }
                 else if (state == "fail") { icon.Text = "✗"; icon.ForeColor = Theme.Bad; lbl.ForeColor = Theme.Bad; }
             });
         }
@@ -344,7 +383,8 @@ namespace MxAliveSetup
         void Start()
         {
             string root = installDir.Text.Trim(), game = gameDir.Text.Trim();
-            if (game.Length == 0 || !File.Exists(Path.Combine(game, "default.xex")))
+            updateMode = IsInstalled(root);
+            if (!updateMode && (game.Length == 0 || !File.Exists(Path.Combine(game, "default.xex"))))
             {
                 MessageBox.Show(this, "Escolha a pasta do jogo que contém o default.xex.", "Pasta do jogo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
@@ -360,7 +400,9 @@ namespace MxAliveSetup
             logFile = new StreamWriter(logPath, false, Encoding.UTF8);
             Log("MX vs. ATV Alive setup  " + DateTime.Now + "  |  Windows " + Environment.OSVersion.Version);
 
-            var t = new Thread(() => Install(root, game)) { IsBackground = true };
+            bar.Maximum = (updateMode ? updateStepNames.Length : stepNames.Length) * 10;
+            var t = updateMode ? new Thread(() => Update(root)) { IsBackground = true }
+                               : new Thread(() => Install(root, game)) { IsBackground = true };
             t.Start();
         }
 
@@ -480,7 +522,86 @@ namespace MxAliveSetup
             }
         }
 
-        void DownloadProject(string root)
+        void DownloadProject(string root) { DownloadProject(root, false); }
+
+        void Update(string root)
+        {
+            int step = 0;
+            try
+            {
+                foreach (var name in new[] { "mx_alive", "MX Alive Launcher" })
+                    if (Process.GetProcessesByName(name).Length > 0)
+                        throw new StepFailed("Feche o jogo e o launcher antes de atualizar.");
+                foreach (var tool in new[] { "git", "cmake", "ninja", "clang" })
+                    if (!Have(tool)) throw new StepFailed(tool + " não foi encontrado. Faça a instalação completa em outra pasta.");
+
+                SetStep(step, "run");
+                DownloadProject(root, true);
+                SetStep(step++, "ok");
+
+                // Reset the SDK sources so build-rexglue.bat re-applies every patch
+                // (the author's local patch + ours) on clean files. Build output is
+                // kept, so only what changed gets recompiled.
+                SetStep(step, "run");
+                string sdk = Path.Combine(root, @"third_party\rexglue-sdk");
+                if (!File.Exists(Path.Combine(sdk, "CMakeLists.txt")))
+                    throw new StepFailed("rexglue-sdk não encontrado em " + sdk + ".");
+                if (Run("git", "-C \"" + sdk + "\" checkout -- src include", root) != 0)
+                    throw new StepFailed("Falha ao preparar o rexglue-sdk.");
+                SetStep(step++, "ok");
+
+                SetStep(step, "run");
+                if (Run("cmd.exe", "/c \"\"" + Path.Combine(root, @"tools\build-rexglue.bat") + "\"\"", root) != 0)
+                    throw new StepFailed("Falha ao recompilar o rexglue. Veja o log.");
+                SetStep(step++, "ok");
+
+                SetStep(step, "run");
+                string bin = Path.Combine(sdk, @"out\install\win-amd64\bin");
+                string gameOut = Path.Combine(root, @"out\build\win-amd64-release");
+                foreach (var dll in Directory.GetFiles(bin, "*.dll"))
+                {
+                    File.Copy(dll, Path.Combine(gameOut, Path.GetFileName(dll)), true);
+                    Log("Atualizado: " + Path.GetFileName(dll));
+                }
+                SetStep(step++, "ok");
+
+                SetStep(step, "run");
+                string launcher = Path.Combine(root, "MX Alive Launcher.exe");
+                CreateShortcut(launcher, root);
+                SetStep(step++, "ok");
+
+                Log("ATUALIZADO!");
+                Ui(() =>
+                {
+                    status.Text = "Atualizado! Pode abrir o jogo pelo atalho.";
+                    status.ForeColor = Theme.Good;
+                    install.Text = "JOGAR"; install.Enabled = true;
+                    install.Click += delegate { Process.Start(new ProcessStartInfo(launcher) { WorkingDirectory = root }); Close(); };
+                });
+            }
+            catch (Exception ex)
+            {
+                string msg = ex is StepFailed ? ex.Message : ex.ToString();
+                Log("ERRO: " + msg);
+                SetStep(Math.Min(step, updateStepNames.Length - 1), "fail");
+                Ui(() =>
+                {
+                    status.Text = "Erro: " + ex.Message;
+                    status.ForeColor = Theme.Bad;
+                    install.Text = "TENTAR DE NOVO"; install.Enabled = true;
+                    browseInstall.Enabled = true; installDir.ReadOnly = false;
+                    MessageBox.Show(this, ex.Message + "\n\nO log completo foi salvo em:\n" + logPath +
+                        "\n\nMande esse arquivo para quem estiver te ajudando.", "Erro na atualização",
+                        MessageBoxButtons.OK, MessageBoxIcon.Error);
+                });
+            }
+            finally
+            {
+                lock (this) { if (logFile != null) { logFile.Dispose(); logFile = null; } }
+            }
+        }
+
+        void DownloadProject(string root, bool update)
         {
             if (Config.RepoZipUrl.Length == 0)
                 throw new StepFailed("Este instalador ainda não tem o endereço do repositório configurado. Baixe o projeto em ZIP, extraia e rode o instalador de dentro da pasta.");
@@ -499,14 +620,29 @@ namespace MxAliveSetup
             // holds this project's files (it may also sit in a subfolder).
             string top = Directory.GetDirectories(tmp).First();
             var marker = Directory.GetFiles(top, "rexglue-mx-fixes.patch", SearchOption.AllDirectories).FirstOrDefault();
-            if (marker == null) throw new StepFailed("O ZIP baixado não tem a correção da água (patches\rexglue-mx-fixes.patch).");
+            if (marker == null) throw new StepFailed("O ZIP baixado não tem a correção da água (patches\\rexglue-mx-fixes.patch).");
             top = Path.GetDirectoryName(Path.GetDirectoryName(marker));
             Log("Usando a pasta do projeto: " + top.Substring(tmp.Length));
+            string self = Path.GetFullPath(Application.ExecutablePath);
             foreach (var f in Directory.GetFiles(top, "*", SearchOption.AllDirectories))
             {
-                string target = Path.Combine(root, f.Substring(top.Length + 1));
+                string rel = f.Substring(top.Length + 1);
+                string target = Path.Combine(root, rel);
+                if (update)
+                {
+                    string low = rel.ToLowerInvariant();
+                    if (low.StartsWith(@"game\") || low.StartsWith(@"out\") || low.StartsWith(@"third_party\") ||
+                        low == "launcher.ini" || low == "setup.log") continue;
+                }
+                if (string.Equals(Path.GetFullPath(target), self, StringComparison.OrdinalIgnoreCase)) continue;
                 Directory.CreateDirectory(Path.GetDirectoryName(target));
-                File.Copy(f, target, true);
+                try { File.Copy(f, target, true); }
+                catch (IOException)
+                {
+                    if (rel.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+                        throw new StepFailed("Feche o launcher e o jogo antes de atualizar (" + rel + " está em uso).");
+                    throw;
+                }
             }
             Directory.Delete(tmp, true); File.Delete(zip);
             Log("Projeto extraído em " + root);
