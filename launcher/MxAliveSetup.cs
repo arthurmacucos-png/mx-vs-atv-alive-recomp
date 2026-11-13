@@ -651,8 +651,29 @@ namespace MxAliveSetup
         void Winget(string id, string extra)
         {
             Log("Instalando " + id + " ...");
-            int code = Run("winget", "install --id " + id + " -e --accept-package-agreements --accept-source-agreements " +
-                (extra ?? "--silent"), null);
+            Log("  Se aparecer um pedido de permissão do Windows (escudo azul/amarelo), clique em SIM.");
+            Log("  Ele pode abrir escondido: confira a barra de tarefas se nada acontecer.");
+            Ui(() => status.Text = "Instalando " + id + "... (se o Windows pedir permissão, clique em Sim)");
+            // Visible console window, no output redirection: winget can stall when its
+            // output is piped, and the user sees progress and any prompt.
+            string args = "install --id " + id + " -e --accept-package-agreements --accept-source-agreements --disable-interactivity " +
+                (extra ?? "--silent");
+            var psi = new ProcessStartInfo(Which("winget"), args)
+            {
+                UseShellExecute = false, CreateNoWindow = false, WindowStyle = ProcessWindowStyle.Normal
+            };
+            psi.EnvironmentVariables["PATH"] = FreshPath();
+            int code = -1;
+            using (var p = Process.Start(psi))
+            {
+                if (!p.WaitForExit(15 * 60 * 1000))
+                {
+                    Log("  " + id + " está demorando mais de 15 minutos. Continuando a aguardar...");
+                    Ui(() => status.Text = id + " ainda instalando. Verifique se há um pedido de permissão na barra de tarefas.");
+                    p.WaitForExit();
+                }
+                code = p.ExitCode;
+            }
             // winget returns non-zero for "already installed"; availability is checked afterwards.
             Log("winget terminou com código " + code);
         }
