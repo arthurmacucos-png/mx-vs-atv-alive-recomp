@@ -393,11 +393,36 @@ namespace MxAliveSetup
                 MessageBox.Show(this, "Instalar dentro do OneDrive vai sincronizar uns 8 GB com a nuvem. Continuar mesmo assim?", "OneDrive", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
                 return;
 
+            // Another setup window (e.g. one stuck waiting for a UAC prompt) still
+            // holds setup.log and may be installing the same things.
+            var me = Process.GetCurrentProcess();
+            var others = Process.GetProcessesByName(me.ProcessName).Where(p => p.Id != me.Id).ToList();
+            if (others.Count > 0)
+            {
+                var answer = MessageBox.Show(this,
+                    "Outra janela do instalador ainda está aberta (ela pode estar esperando uma permissão do Windows na barra de tarefas).\n\n" +
+                    "Fechar a outra janela e continuar aqui?", "Instalador já aberto",
+                    MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
+                if (answer != DialogResult.Yes) return;
+                foreach (var p in others)
+                {
+                    try { p.Kill(); p.WaitForExit(5000); } catch { }
+                }
+            }
+
             install.Enabled = browseGame.Enabled = browseInstall.Enabled = false;
             installDir.ReadOnly = gameDir.ReadOnly = true;
             Directory.CreateDirectory(root);
             logPath = Path.Combine(root, "setup.log");
-            logFile = new StreamWriter(logPath, false, Encoding.UTF8);
+            try
+            {
+                logFile = new StreamWriter(new FileStream(logPath, FileMode.Create, FileAccess.Write, FileShare.ReadWrite), Encoding.UTF8);
+            }
+            catch (IOException)
+            {
+                logPath = Path.Combine(root, "setup-" + DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".log");
+                logFile = new StreamWriter(new FileStream(logPath, FileMode.Create, FileAccess.Write, FileShare.ReadWrite), Encoding.UTF8);
+            }
             Log("MX vs. ATV Alive setup  " + DateTime.Now + "  |  Windows " + Environment.OSVersion.Version);
 
             bar.Maximum = (updateMode ? updateStepNames.Length : stepNames.Length) * 10;
