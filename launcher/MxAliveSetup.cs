@@ -61,6 +61,7 @@ namespace MxAliveSetup
             { "Preparar o rexglue para as novas correções", "Prepare rexglue for the new fixes" },
             { "Recompilar o módulo gráfico", "Rebuild the graphics module" },
             { "Instalar as DLLs novas no jogo", "Install the new DLLs into the game" },
+            { "Recompilar o jogo (modo online; pode levar de 10 a 60 min)", "Rebuild the game (online mode; can take 10 to 60 min)" },
             { "Atualizar o atalho", "Update the shortcut" },
             { "  (já estava pronto)", "  (already done)" },
             { "Escolha a pasta do jogo e clique em INSTALAR.", "Choose the game folder and click INSTALL." },
@@ -441,6 +442,7 @@ namespace MxAliveSetup
             "Preparar o rexglue para as novas correções",
             "Recompilar o módulo gráfico",
             "Instalar as DLLs novas no jogo",
+            "Recompilar o jogo (modo online; pode levar de 10 a 60 min)",
             "Atualizar o atalho"
         };
 
@@ -839,6 +841,9 @@ namespace MxAliveSetup
                     throw new StepFailed("rexglue-sdk não encontrado em " + sdk + ".");
                 if (Run("git", "-C \"" + sdk + "\" checkout -- src include", root) != 0)
                     throw new StepFailed("Falha ao preparar o rexglue-sdk.");
+                // Files a previous patch added (not tracked by git) must go too,
+                // or the patch that creates them cannot be applied again.
+                Run("git", "-C \"" + sdk + "\" clean -fdq -- src include", root);
                 SetStep(step++, "ok");
 
                 SetStep(step, "run");
@@ -855,6 +860,21 @@ namespace MxAliveSetup
                     Log("Atualizado: " + Path.GetFileName(dll));
                 }
                 SetStep(step++, "ok");
+
+                // The manifest can gain functions (online mode): regenerate the
+                // recompiled code and rebuild the game. Unchanged files are skipped.
+                SetStep(step, "run");
+                string rebuild = Path.Combine(root, @"toolsebuild-game.bat");
+                if (File.Exists(rebuild))
+                {
+                    if (Run("cmd.exe", "/c \"\"" + rebuild + "\"\"", root) != 0)
+                        throw new StepFailed("Falha ao recompilar o jogo. Veja o log.");
+                    // The game build may copy the SDK DLLs again; keep ours on top.
+                    foreach (var dll in Directory.GetFiles(bin, "*.dll"))
+                        File.Copy(dll, Path.Combine(gameOut, Path.GetFileName(dll)), true);
+                    SetStep(step++, "ok");
+                }
+                else SetStep(step++, "skip");
 
                 SetStep(step, "run");
                 string launcher = Path.Combine(root, "MX Alive Launcher.exe");

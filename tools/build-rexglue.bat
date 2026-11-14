@@ -56,7 +56,7 @@ if not errorlevel 1 (
 
 cd /d "%SDK%"
 echo === configuring rexglue (win-amd64) ===
-cmake --preset win-amd64
+cmake --preset win-amd64 -DCMAKE_SHARED_LINKER_FLAGS=-loldnames -DCMAKE_EXE_LINKER_FLAGS=-loldnames
 if errorlevel 1 exit /b 1
 echo === building rexglue Release + install ===
 cmake --build out\build\win-amd64 --config Release --target install

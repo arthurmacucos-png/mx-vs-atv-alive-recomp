@@ -39,6 +39,28 @@ namespace MxAliveLauncher
             { "Idioma", "Language" },
             { "Áudio", "Audio" },
             { "Sem som (mudo)", "No sound (mute)" },
+            { "Online", "Online" },
+            { "Desligado (offline)", "Off (offline)" },
+            { "Criar sala (eu sou o servidor)", "Host a room (I am the server)" },
+            { "Entrar na sala de um amigo", "Join a friend's room" },
+            { "IP do host", "Host IP" },
+            { "Código da sala", "Room code" },
+            { "Meu código", "My code" },
+            { "Código da sala copiado: ", "Room code copied: " },
+            { "Mande esse código para o amigo. Ele cola em \"Código da sala\" e escolhe \"Entrar na sala de um amigo\".",
+              "Send this code to your friend. They paste it in \"Room code\" and choose \"Join a friend's room\"." },
+            { "Mesma casa/rede: ", "Same house/network: " },
+            { "Pela internet: ", "Over the internet: " },
+            { "Não consegui descobrir o IP da internet (sem conexão?).", "Couldn't find the internet IP (offline?)." },
+            { "Código da sala inválido.", "Invalid room code." },
+            { "Seu nome", "Your name" },
+            { "Online: sala criada. Passe para os amigos o seu IP: ", "Online: room created. Give your friends your IP: " },
+            { " (libere a porta UDP ", " (forward UDP port " },
+            { " no roteador se for pela internet)", " on the router when playing over the internet)" },
+            { "Online: entrando na sala de ", "Online: joining the room of " },
+            { "Online: digite o IP do host.", "Online: type the host IP." },
+            { "Para salvar o progresso, volte ao menu da carreira depois da prova. Sair direto da tela de resultado não grava o save.",
+              "To save progress, go back to the career menu after the event. Quitting from the results screen does not save." },
             { "Limite de FPS", "FPS limit" },
             { "30 FPS (console)", "30 FPS (console)" },
             { "60 FPS (recomendado)", "60 FPS (recommended)" },
@@ -537,7 +559,8 @@ namespace MxAliveLauncher
         Label gameStatus, dlcStatus;
         Button langButton;
         Button installDlc;
-        ComboBox language, fps, upscaling, backend, gpuMode;
+        ComboBox language, fps, upscaling, backend, gpuMode, netMode;
+        TextBox netHost, netName;
         CheckBox fullscreen, vsync, mnk, mnkMouse, backup, clearCache, debugLog, asyncReadback, mute;
         NumericUpDown sensitivity;
         ListBox controllers;
@@ -600,6 +623,7 @@ namespace MxAliveLauncher
                 CheckGame();
                 ScanControllers();
                 Log("Saves: " + saveRoot);
+                Log("Para salvar o progresso, volte ao menu da carreira depois da prova. Sair direto da tela de resultado não grava o save.");
                 UpdateDlcStatus(true);
             };
             FormClosing += delegate { SaveSettings(); };
@@ -887,14 +911,29 @@ namespace MxAliveLauncher
         {
             var s = new Section("Avançado", 468, 446, 436, 226);
             Controls.Add(s);
-            backup = MakeCheck(s, "Backup do save antes de jogar (recomendado)", 16, 42, 410);
-            asyncReadback = MakeCheck(s, "Cópia de vídeo assíncrona (mais FPS)", 16, 72, 410);
-            clearCache = MakeCheck(s, "Limpar o cache de shaders ao iniciar", 16, 102, 410);
-            debugLog = MakeCheck(s, "Log detalhado (para investigar travamentos)", 16, 132, 410);
-            MakeHint(s,
-                "Para salvar o progresso, volte ao menu da carreira depois da\n" +
-                "prova. Sair direto da tela de resultado não grava o save.",
-                16, 168, 410, 40);
+            backup = MakeCheck(s, "Backup do save antes de jogar (recomendado)", 16, 36, 410);
+            asyncReadback = MakeCheck(s, "Cópia de vídeo assíncrona (mais FPS)", 16, 60, 410);
+            clearCache = MakeCheck(s, "Limpar o cache de shaders ao iniciar", 16, 84, 410);
+            debugLog = MakeCheck(s, "Log detalhado (para investigar travamentos)", 16, 108, 410);
+
+            // Online: the player who hosts is the server/relay (net_relay in rexglue).
+            MakeLabel(s, "Online", 16, 138);
+            netMode = MakeCombo(s, 170, 138, 250,
+                new Option("Desligado (offline)", "off"),
+                new Option("Criar sala (eu sou o servidor)", "host"),
+                new Option("Entrar na sala de um amigo", "join"));
+            MakeLabel(s, "Código da sala", 16, 168);
+            netHost = new TextBox { BackColor = Theme.Field, ForeColor = Theme.Text, BorderStyle = BorderStyle.FixedSingle };
+            netHost.SetBounds(170, 168, 250, 24);
+            s.Controls.Add(netHost);
+            MakeLabel(s, "Seu nome", 16, 196);
+            netName = new TextBox { BackColor = Theme.Field, ForeColor = Theme.Text, BorderStyle = BorderStyle.FixedSingle, MaxLength = 15 };
+            netName.SetBounds(170, 196, 140, 24);
+            s.Controls.Add(netName);
+            var myCode = MakeButton(s, "Meu código", 318, 194, 102, 26);
+            myCode.FlatAppearance.BorderColor = Theme.Accent;
+            myCode.Click += delegate { ShowRoomCode(); };
+            netMode.SelectedIndexChanged += delegate { netHost.Enabled = Val(netMode) == "join"; };
         }
 
         void BuildTools()
@@ -964,11 +1003,84 @@ namespace MxAliveLauncher
             clearCache.Checked = settings.GetBool("clear_cache", false);
             debugLog.Checked = settings.GetBool("debug_log", false);
             mute.Checked = settings.GetBool("mute", false);
+            SelectByValue(netMode, settings.Get("net_mode", "off"));
+            netHost.Text = settings.Get("net_host", "");
+            netName.Text = settings.Get("net_name", Environment.UserName);
+            netHost.Enabled = Val(netMode) == "join";
+        }
+
+        // Room code = the host's IPv4 packed in base 36, e.g. MX-1A2B3C4.
+        // The join field also accepts a plain IP or host name.
+        const string CodeDigits = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+        static string EncodeRoomCode(string ip)
+        {
+            System.Net.IPAddress a;
+            if (!System.Net.IPAddress.TryParse(ip, out a)) return ip;
+            byte[] b = a.GetAddressBytes();
+            if (b.Length != 4) return ip;
+            ulong v = ((ulong)b[0] << 24) | ((ulong)b[1] << 16) | ((ulong)b[2] << 8) | b[3];
+            string c = "";
+            do { c = CodeDigits[(int)(v % 36)] + c; v /= 36; } while (v > 0);
+            return "MX-" + c;
+        }
+
+        static string DecodeRoomCode(string text)
+        {
+            string t = text.Trim().ToUpperInvariant().Replace(" ", "");
+            if (!t.StartsWith("MX-")) return text.Trim().Length > 0 ? text.Trim() : null;
+            ulong v = 0;
+            foreach (char ch in t.Substring(3))
+            {
+                int d = CodeDigits.IndexOf(ch);
+                if (d < 0) return null;
+                v = v * 36 + (ulong)d;
+            }
+            if (v > 0xFFFFFFFFUL || t.Length < 4) return null;
+            return ((v >> 24) & 255) + "." + ((v >> 16) & 255) + "." + ((v >> 8) & 255) + "." + (v & 255);
+        }
+
+        void ShowRoomCode()
+        {
+            string pub = null;
+            try
+            {
+                System.Net.ServicePointManager.SecurityProtocol = (System.Net.SecurityProtocolType)3072;
+                var wc = new System.Net.WebClient();
+                wc.Headers.Add("User-Agent", "MXAliveLauncher");
+                pub = wc.DownloadString("https://api.ipify.org").Trim();
+            }
+            catch { }
+            string local = LocalIps().Split(new[] { " / " }, StringSplitOptions.None)[0];
+            string localCode = EncodeRoomCode(local);
+            string pubCode = pub == null ? null : EncodeRoomCode(pub);
+            string copy = pubCode ?? localCode;
+            try { Clipboard.SetText(copy); } catch { }
+            Log("Código da sala copiado: " + copy);
+            Log("Mesma casa/rede: " + localCode + "   (" + local + ")");
+            if (pub != null) Log("Pela internet: " + pubCode + "   (" + pub + ")  (libere a porta UDP " + settings.Get("net_port", "36015") + " no roteador se for pela internet)");
+            else Log("Não consegui descobrir o IP da internet (sem conexão?).");
+            Log("Mande esse código para o amigo. Ele cola em \"Código da sala\" e escolhe \"Entrar na sala de um amigo\".");
+        }
+
+        static string LocalIps()
+        {
+            var list = new List<string>();
+            try
+            {
+                foreach (var ip in System.Net.Dns.GetHostEntry(System.Net.Dns.GetHostName()).AddressList)
+                    if (ip.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork) list.Add(ip.ToString());
+            }
+            catch { }
+            return list.Count == 0 ? "?" : string.Join(" / ", list.ToArray());
         }
 
         void SaveSettings()
         {
             settings.Set("game_dir", gameDir.Text);
+            settings.Set("net_mode", Val(netMode));
+            settings.Set("net_host", netHost.Text.Trim());
+            settings.Set("net_name", netName.Text.Trim());
             settings.Set("language", Val(language));
             settings.Set("fps", Val(fps));
             settings.Set("upscaling", Val(upscaling));
@@ -1207,6 +1319,33 @@ namespace MxAliveLauncher
             a.Append(" --input_backend=").Append(Val(backend));
             string db = Path.Combine(root, @"controllers\gamecontrollerdb.txt");
             if (File.Exists(db)) a.Append(" ").Append(Q("--hid_mappings_file=" + db));
+
+            string nm = Val(netMode);
+            string netPort = settings.Get("net_port", "36015");
+            if (nm == "join" && netHost.Text.Trim().Length == 0)
+            {
+                Log("Online: digite o IP do host.");
+                return;
+            }
+            if (nm == "host" || nm == "join")
+            {
+                a.Append(" --net_mode=").Append(nm);
+                a.Append(" --net_port=").Append(netPort);
+                string who = netName.Text.Trim();
+                if (who.Length > 0) a.Append(" ").Append(Q("--net_name=" + who));
+                if (nm == "join")
+                {
+                    string hostIp = DecodeRoomCode(netHost.Text.Trim());
+                    if (hostIp == null) { Log("Código da sala inválido."); return; }
+                    a.Append(" ").Append(Q("--net_host=" + hostIp));
+                    Log("Online: entrando na sala de " + netHost.Text.Trim());
+                }
+                else
+                {
+                    Log("Online: sala criada. Passe para os amigos o seu IP: " + LocalIps() +
+                        " (libere a porta UDP " + netPort + " no roteador se for pela internet)");
+                }
+            }
 
             var psi = new ProcessStartInfo(exe, a.ToString())
             {

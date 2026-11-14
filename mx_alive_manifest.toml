@@ -11,6 +11,294 @@ out_directory_path = "generated/default"
 includes = []
 
 # Explicit function boundaries for code the analyzer could not reach.
+# Functions only reached through vtables/callbacks (found with --scan_missing_functions);
+# most belong to the online code, which never ran offline.
+[entrypoint.functions."0x82342F1C"]
+end = 0x82343050
+
+[entrypoint.functions."0x825957AC"]
+end = 0x82595B04
+
+[entrypoint.functions."0x825AB030"]
+end = 0x825AB040
+
+[entrypoint.functions."0x825AB360"]
+end = 0x825AB388
+
+[entrypoint.functions."0x825AB388"]
+end = 0x825AB3B0
+
+[entrypoint.functions."0x825AB3B0"]
+end = 0x825AB3D8
+
+[entrypoint.functions."0x825AB3D8"]
+end = 0x825AB400
+
+[entrypoint.functions."0x825AB7F8"]
+end = 0x825AB8B8
+
+[entrypoint.functions."0x82633AC0"]
+end = 0x82633AF8
+
+[entrypoint.functions."0x82635C80"]
+end = 0x82635CBC
+
+[entrypoint.functions."0x82635CBC"]
+end = 0x82635CFC
+
+[entrypoint.functions."0x826361CC"]
+end = 0x8263620C
+
+[entrypoint.functions."0x82636700"]
+end = 0x82636730
+
+[entrypoint.functions."0x82636860"]
+end = 0x82636890
+
+[entrypoint.functions."0x82652D04"]
+end = 0x82652D48
+
+[entrypoint.functions."0x82689F58"]
+end = 0x8268A080
+
+[entrypoint.functions."0x82704078"]
+end = 0x82704090
+
+[entrypoint.functions."0x8273E458"]
+end = 0x8273E488
+
+[entrypoint.functions."0x827622B8"]
+end = 0x827622C0
+
+[entrypoint.functions."0x82771D38"]
+end = 0x82771D48
+
+[entrypoint.functions."0x827799B0"]
+end = 0x827799C0
+
+[entrypoint.functions."0x827A00A0"]
+end = 0x827A00D4
+
+[entrypoint.functions."0x827C2E68"]
+end = 0x827C2E78
+
+[entrypoint.functions."0x82895810"]
+end = 0x82895830
+
+[entrypoint.functions."0x82895830"]
+end = 0x82895848
+
+[entrypoint.functions."0x82898670"]
+end = 0x82898688
+
+[entrypoint.functions."0x82898688"]
+end = 0x828986A0
+
+[entrypoint.functions."0x828B2C38"]
+end = 0x828B2C60
+
+[entrypoint.functions."0x828B2C70"]
+end = 0x828B2C78
+
+[entrypoint.functions."0x828B2CD0"]
+end = 0x828B2CE8
+
+[entrypoint.functions."0x828BD878"]
+end = 0x828BD880
+
+[entrypoint.functions."0x828C5658"]
+end = 0x828C5668
+
+[entrypoint.functions."0x828D13A0"]
+end = 0x828D13B8
+
+[entrypoint.functions."0x828F8C40"]
+end = 0x828F8C48
+
+[entrypoint.functions."0x8296E808"]
+end = 0x8296E810
+
+[entrypoint.functions."0x8299E708"]
+end = 0x8299E71C
+
+[entrypoint.functions."0x829A4218"]
+end = 0x829A4230
+
+[entrypoint.functions."0x829E5948"]
+end = 0x829E5A60
+
+[entrypoint.functions."0x829E5F90"]
+end = 0x829E6024
+
+[entrypoint.functions."0x829E7960"]
+end = 0x829E7980
+
+[entrypoint.functions."0x82A06AE0"]
+end = 0x82A06AF0
+
+[entrypoint.functions."0x82A58A18"]
+end = 0x82A58A20
+
+[entrypoint.functions."0x82A7A450"]
+end = 0x82A7A460
+
+[entrypoint.functions."0x82A820A0"]
+end = 0x82A820B8
+
+[entrypoint.functions."0x82ADA274"]
+end = 0x82ADA308
+
+[entrypoint.functions."0x82B26140"]
+end = 0x82B26260
+
+[entrypoint.functions."0x82B39E68"]
+end = 0x82B3A0A0
+
+[entrypoint.functions."0x82BDB678"]
+end = 0x82BDB690
+
+[entrypoint.functions."0x82BDBE24"]
+end = 0x82BDBE58
+
+[entrypoint.functions."0x82BDDDA0"]
+end = 0x82BDDDB8
+
+[entrypoint.functions."0x82BE2888"]
+end = 0x82BE28B0
+
+[entrypoint.functions."0x82BE714C"]
+end = 0x82BE7180
+
+[entrypoint.functions."0x82BED774"]
+end = 0x82BED78C
+
+[entrypoint.functions."0x82BF6700"]
+end = 0x82BF675C
+
+[entrypoint.functions."0x82BF6878"]
+end = 0x82BF6890
+
+[entrypoint.functions."0x82BF6BE4"]
+end = 0x82BF6BFC
+
+[entrypoint.functions."0x82BF6D24"]
+end = 0x82BF6D30
+
+[entrypoint.functions."0x82BF7404"]
+end = 0x82BF74C0
+
+[entrypoint.functions."0x82BFD568"]
+end = 0x82BFD578
+
+[entrypoint.functions."0x82BFF6D0"]
+end = 0x82BFFBF4
+
+[entrypoint.functions."0x82C00EA4"]
+end = 0x82C0101C
+
+[entrypoint.functions."0x82C0101C"]
+end = 0x82C01040
+
+[entrypoint.functions."0x82C0B180"]
+end = 0x82C0B194
+
+[entrypoint.functions."0x82C4F540"]
+end = 0x82C4F550
+
+[entrypoint.functions."0x82C4F550"]
+end = 0x82C4F584
+
+[entrypoint.functions."0x82C516C0"]
+end = 0x82C516C8
+
+[entrypoint.functions."0x82C5A7B8"]
+end = 0x82C5A7D8
+
+[entrypoint.functions."0x82C619D0"]
+end = 0x82C619D8
+
+[entrypoint.functions."0x82C619D8"]
+end = 0x82C619E0
+
+[entrypoint.functions."0x82C619E0"]
+end = 0x82C619E8
+
+[entrypoint.functions."0x82C619F8"]
+end = 0x82C61A00
+
+[entrypoint.functions."0x82C61A00"]
+end = 0x82C61A08
+
+[entrypoint.functions."0x82C675B8"]
+end = 0x82C675C0
+
+[entrypoint.functions."0x82C675C8"]
+end = 0x82C675D0
+
+[entrypoint.functions."0x82C675D0"]
+end = 0x82C675D8
+
+[entrypoint.functions."0x82C675D8"]
+end = 0x82C675E0
+
+[entrypoint.functions."0x82C67878"]
+end = 0x82C67880
+
+[entrypoint.functions."0x82C67890"]
+end = 0x82C67898
+
+[entrypoint.functions."0x82C67898"]
+end = 0x82C678A0
+
+[entrypoint.functions."0x82C678A0"]
+end = 0x82C678A8
+
+[entrypoint.functions."0x82C678A8"]
+end = 0x82C678B0
+
+[entrypoint.functions."0x82C678B0"]
+end = 0x82C678B8
+
+[entrypoint.functions."0x82C78868"]
+end = 0x82C78870
+
+[entrypoint.functions."0x82C794F0"]
+end = 0x82C794F8
+
+[entrypoint.functions."0x82C7C288"]
+end = 0x82C7C2B4
+
+[entrypoint.functions."0x82C7C518"]
+end = 0x82C7C520
+
+[entrypoint.functions."0x82C84B80"]
+end = 0x82C84B98
+
+[entrypoint.functions."0x82C84B98"]
+end = 0x82C84CAC
+
+[entrypoint.functions."0x82C87698"]
+end = 0x82C876A0
+
+[entrypoint.functions."0x82CAADA0"]
+end = 0x82CAADBC
+
+[entrypoint.functions."0x82CB1270"]
+end = 0x82CB12E4
+
+[entrypoint.functions."0x82CBBF58"]
+end = 0x82CBBF68
+
+[entrypoint.functions."0x82CCA7E0"]
+end = 0x82CCA84C
+
+[entrypoint.functions."0x82CCA8F8"]
+end = 0x82CCA964
+
+# Online (XLive) vtable thunk reached only when signed in to LIVE.
+[entrypoint.functions."0x82C67880"]
+end = 0x82C67888
+
 [entrypoint.functions."0x82681BE0"]
 end = 0x82681C54
 
