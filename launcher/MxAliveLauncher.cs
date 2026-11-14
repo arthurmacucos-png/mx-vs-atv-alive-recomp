@@ -366,7 +366,7 @@ namespace MxAliveLauncher
         TextBox gameDir;
         Label gameStatus, dlcStatus;
         Button installDlc;
-        ComboBox language, perf, fps, upscaling, backend, gpuMode;
+        ComboBox language, fps, upscaling, backend, gpuMode;
         CheckBox fullscreen, vsync, mnk, mnkMouse, backup, clearCache, debugLog, asyncReadback, mute;
         NumericUpDown sensitivity;
         ListBox controllers;
@@ -633,39 +633,33 @@ namespace MxAliveLauncher
         {
             var s = new Section("Vídeo", 468, 162, 436, 272);
             Controls.Add(s);
-            MakeLabel(s, "Desempenho", 16, 42);
-            perf = MakeCombo(s, 170, 42, 250,
-                new Option("Qualidade (padrão)", "0"),
-                new Option("Equilibrado (experimental)", "4096"),
-                new Option("Rápido (experimental)", "1024"));
-            MakeLabel(s, "Limite de FPS", 16, 76);
-            fps = MakeCombo(s, 170, 76, 250,
+            MakeLabel(s, "Limite de FPS", 16, 42);
+            fps = MakeCombo(s, 170, 42, 250,
                 new Option("30 FPS (console)", "30"),
                 new Option("60 FPS (recomendado)", "60"),
                 new Option("120 FPS (instável)", "120"),
                 new Option("144 FPS (instável)", "144"),
                 new Option("240 FPS (instável)", "240"),
                 new Option("Sem limite (teste)", "500"));
-            MakeLabel(s, "Upscaling", 16, 110);
-            upscaling = MakeCombo(s, 170, 110, 250,
+            MakeLabel(s, "Upscaling", 16, 76);
+            upscaling = MakeCombo(s, 170, 76, 250,
                 new Option("Bilinear (padrão)", "bilinear"),
                 new Option("AMD CAS (nitidez)", "cas"),
                 new Option("AMD FSR 1.0", "fsr"),
                 new Option("AMD FSR 2 (experimental)", "fsr2"),
                 new Option("AMD FSR 3 (experimental)", "fsr3"));
-            fullscreen = MakeCheck(s, "Tela cheia", 16, 144, 190);
-            vsync = MakeCheck(s, "VSync", 220, 144, 190);
-            MakeLabel(s, "Renderização", 16, 174);
-            gpuMode = MakeCombo(s, 170, 174, 250,
+            fullscreen = MakeCheck(s, "Tela cheia", 16, 112, 190);
+            vsync = MakeCheck(s, "VSync", 220, 112, 190);
+            MakeLabel(s, "Renderização", 16, 144);
+            gpuMode = MakeCombo(s, 170, 144, 250,
                 new Option("Padrão (rápido)", "default"),
                 new Option("ROV (precisão, NVIDIA)", "rov"),
                 new Option("Cópia exata (sem piscar)", "full"),
                 new Option("ROV + cópia exata", "rov_full"));
             MakeHint(s,
-                "Desempenho Rápido/Equilibrado: menos cópias de vídeo, mais FPS\n" +
-                "(experimental: se aparecer defeito, volte para Qualidade).\n" +
+                "60 FPS é o modo testado e estável.\n" +
                 "O jogo é 720p: numa tela 1080p use Upscaling FSR para mais nitidez.",
-                16, 204, 410, 62);
+                16, 182, 410, 62);
         }
 
         void BuildControls()
@@ -759,7 +753,6 @@ namespace MxAliveLauncher
         {
             gameDir.Text = settings.Get("game_dir", Path.Combine(root, GameDirName));
             SelectByValue(language, settings.Get("language", "1"));
-            SelectByValue(perf, settings.Get("perf", "0"));
             SelectByValue(fps, settings.Get("fps", "60"));
             SelectByValue(upscaling, settings.Get("upscaling", "bilinear"));
             SelectByValue(gpuMode, settings.Get("gpu_mode", "default"));
@@ -783,7 +776,6 @@ namespace MxAliveLauncher
         {
             settings.Set("game_dir", gameDir.Text);
             settings.Set("language", Val(language));
-            settings.Set("perf", Val(perf));
             settings.Set("fps", Val(fps));
             settings.Set("upscaling", Val(upscaling));
             settings.Set("gpu_mode", Val(gpuMode));
@@ -1003,7 +995,6 @@ namespace MxAliveLauncher
             a.Append(" --gpu_allow_invalid_fetch_constants --d3d12_readback_resolve --query_occlusion_fake_sample_count=-1");
             a.Append(" --video_mode_refresh_rate=").Append(f * 2);
             // 1080p guest mode removed: the game is 720p and renders models black at 1080p.
-            if (Val(perf) != "0") a.Append(" --readback_resolve_max_kb=").Append(Val(perf));
             a.Append(asyncReadback.Checked ? "" : " --no-d3d12_readback_resolve_async");
             a.Append(fullscreen.Checked ? " --fullscreen" : " --no-fullscreen");
             a.Append(vsync.Checked ? " --vsync" : " --no-vsync");
@@ -1043,7 +1034,7 @@ namespace MxAliveLauncher
                 game = Process.Start(psi);
                 game.EnableRaisingEvents = true;
                 game.Exited += delegate { BeginInvoke(new Action(OnGameExited)); };
-                Log("Iniciando: " + f + " FPS, desempenho " + perf.SelectedItem + ", controle " + Val(backend).ToUpperInvariant());
+                Log("Iniciando: " + f + " FPS, controle " + Val(backend).ToUpperInvariant());
                 play.Enabled = false; play.BackColor = Theme.AccentDark;
                 stop.Enabled = true; stop.ForeColor = Theme.Text;
                 fpsLabel.Text = "carregando...";
