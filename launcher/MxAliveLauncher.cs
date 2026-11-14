@@ -366,7 +366,7 @@ namespace MxAliveLauncher
         TextBox gameDir;
         Label gameStatus, dlcStatus;
         Button installDlc;
-        ComboBox language, resolution, fps, upscaling, backend, gpuMode;
+        ComboBox language, perf, fps, upscaling, backend, gpuMode;
         CheckBox fullscreen, vsync, mnk, mnkMouse, backup, clearCache, debugLog, asyncReadback, mute;
         NumericUpDown sensitivity;
         ListBox controllers;
@@ -633,10 +633,11 @@ namespace MxAliveLauncher
         {
             var s = new Section("Vídeo", 468, 162, 436, 272);
             Controls.Add(s);
-            MakeLabel(s, "Resolução do jogo", 16, 42);
-            resolution = MakeCombo(s, 170, 42, 250,
-                new Option("1280x720 (original)", "720"),
-                new Option("1920x1080 (Full HD)", "1080"));
+            MakeLabel(s, "Desempenho", 16, 42);
+            perf = MakeCombo(s, 170, 42, 250,
+                new Option("Qualidade (padrão)", "0"),
+                new Option("Equilibrado (experimental)", "4096"),
+                new Option("Rápido (experimental)", "1024"));
             MakeLabel(s, "Limite de FPS", 16, 76);
             fps = MakeCombo(s, 170, 76, 250,
                 new Option("30 FPS (console)", "30"),
@@ -661,9 +662,9 @@ namespace MxAliveLauncher
                 new Option("Cópia exata (sem piscar)", "full"),
                 new Option("ROV + cópia exata", "rov_full"));
             MakeHint(s,
-                "60 FPS é o modo testado e estável. Acima disso as corridas ficam\n" +
-                "entre 85 e 95 FPS (limite do processador). 1080p é um modo nativo\n" +
-                "do Xbox 360. O modo 2K foi removido de propósito: ele corrompe o save.",
+                "Desempenho Rápido/Equilibrado: menos cópias de vídeo, mais FPS\n" +
+                "(experimental: se aparecer defeito, volte para Qualidade).\n" +
+                "O jogo é 720p: numa tela 1080p use Upscaling FSR para mais nitidez.",
                 16, 204, 410, 62);
         }
 
@@ -758,7 +759,7 @@ namespace MxAliveLauncher
         {
             gameDir.Text = settings.Get("game_dir", Path.Combine(root, GameDirName));
             SelectByValue(language, settings.Get("language", "1"));
-            SelectByValue(resolution, settings.Get("resolution", "720"));
+            SelectByValue(perf, settings.Get("perf", "0"));
             SelectByValue(fps, settings.Get("fps", "60"));
             SelectByValue(upscaling, settings.Get("upscaling", "bilinear"));
             SelectByValue(gpuMode, settings.Get("gpu_mode", "default"));
@@ -782,7 +783,7 @@ namespace MxAliveLauncher
         {
             settings.Set("game_dir", gameDir.Text);
             settings.Set("language", Val(language));
-            settings.Set("resolution", Val(resolution));
+            settings.Set("perf", Val(perf));
             settings.Set("fps", Val(fps));
             settings.Set("upscaling", Val(upscaling));
             settings.Set("gpu_mode", Val(gpuMode));
@@ -1001,7 +1002,8 @@ namespace MxAliveLauncher
             a.Append(" --log_level=").Append(debugLog.Checked ? "debug" : "info");
             a.Append(" --gpu_allow_invalid_fetch_constants --d3d12_readback_resolve --query_occlusion_fake_sample_count=-1");
             a.Append(" --video_mode_refresh_rate=").Append(f * 2);
-            if (Val(resolution) == "1080") a.Append(" --video_mode_width=1920 --video_mode_height=1080");
+            // 1080p guest mode removed: the game is 720p and renders models black at 1080p.
+            if (Val(perf) != "0") a.Append(" --readback_resolve_max_kb=").Append(Val(perf));
             a.Append(asyncReadback.Checked ? "" : " --no-d3d12_readback_resolve_async");
             a.Append(fullscreen.Checked ? " --fullscreen" : " --no-fullscreen");
             a.Append(vsync.Checked ? " --vsync" : " --no-vsync");
@@ -1041,7 +1043,7 @@ namespace MxAliveLauncher
                 game = Process.Start(psi);
                 game.EnableRaisingEvents = true;
                 game.Exited += delegate { BeginInvoke(new Action(OnGameExited)); };
-                Log("Iniciando: " + f + " FPS, " + (Val(resolution) == "1080" ? "1080p" : "720p") + ", controle " + Val(backend).ToUpperInvariant());
+                Log("Iniciando: " + f + " FPS, desempenho " + perf.SelectedItem + ", controle " + Val(backend).ToUpperInvariant());
                 play.Enabled = false; play.BackColor = Theme.AccentDark;
                 stop.Enabled = true; stop.ForeColor = Theme.Text;
                 fpsLabel.Text = "carregando...";
