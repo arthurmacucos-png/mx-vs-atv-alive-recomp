@@ -61,6 +61,8 @@ namespace MxAliveSetup
             { "Preparar o rexglue para as novas correções", "Prepare rexglue for the new fixes" },
             { "Recompilar o módulo gráfico", "Rebuild the graphics module" },
             { "Instalar as DLLs novas no jogo", "Install the new DLLs into the game" },
+            { "  O winget deste PC é antigo e não aceitou uma opção. Tentando de novo de outro jeito...", "  This PC's winget is old and rejected an option. Trying again another way..." },
+            { "  O winget deste PC está desatualizado. Abra a Microsoft Store, atualize o \"Instalador de Aplicativo\" (App Installer) e rode o instalador de novo.", "  This PC's winget is outdated. Open the Microsoft Store, update \"App Installer\" and run the installer again." },
             { "Recompilar o jogo (modo online; pode levar de 10 a 60 min)", "Rebuild the game (online mode; can take 10 to 60 min)" },
             { "Atualizar o atalho", "Update the shortcut" },
             { "  (já estava pronto)", "  (already done)" },
@@ -967,26 +969,41 @@ namespace MxAliveSetup
             Ui(() => status.Text = L.T("Instalando " + id + "... (se o Windows pedir permissão, clique em Sim)"));
             // Visible console window, no output redirection: winget can stall when its
             // output is piped, and the user sees progress and any prompt.
-            string args = "install --id " + id + " -e --accept-package-agreements --accept-source-agreements --disable-interactivity " +
-                (extra ?? "--silent");
-            var psi = new ProcessStartInfo(Which("winget"), args)
+            // Older winget versions reject options they do not know with
+            // 0x8A150002 (invalid arguments): retry with fewer options.
+            const int InvalidArguments = unchecked((int)0x8A150002);
+            string[] variants =
             {
-                UseShellExecute = false, CreateNoWindow = false, WindowStyle = ProcessWindowStyle.Normal
+                "--accept-package-agreements --accept-source-agreements --disable-interactivity ",
+                "--accept-package-agreements --accept-source-agreements ",
+                ""
             };
-            psi.EnvironmentVariables["PATH"] = FreshPath();
             int code = -1;
-            using (var p = Process.Start(psi))
+            foreach (string options in variants)
             {
-                if (!p.WaitForExit(15 * 60 * 1000))
+                string args = "install --id " + id + " -e " + options + (extra ?? "--silent");
+                var psi = new ProcessStartInfo(Which("winget"), args)
                 {
-                    Log("  " + id + " está demorando mais de 15 minutos. Continuando a aguardar...");
-                    Ui(() => status.Text = L.T(id + " ainda instalando. Verifique se há um pedido de permissão na barra de tarefas."));
-                    p.WaitForExit();
+                    UseShellExecute = false, CreateNoWindow = false, WindowStyle = ProcessWindowStyle.Normal
+                };
+                psi.EnvironmentVariables["PATH"] = FreshPath();
+                using (var p = Process.Start(psi))
+                {
+                    if (!p.WaitForExit(15 * 60 * 1000))
+                    {
+                        Log("  " + id + " está demorando mais de 15 minutos. Continuando a aguardar...");
+                        Ui(() => status.Text = L.T(id + " ainda instalando. Verifique se há um pedido de permissão na barra de tarefas."));
+                        p.WaitForExit();
+                    }
+                    code = p.ExitCode;
                 }
-                code = p.ExitCode;
+                // winget returns non-zero for "already installed"; availability is checked afterwards.
+                Log("winget terminou com código " + code);
+                if (code != InvalidArguments) break;
+                Log("  O winget deste PC é antigo e não aceitou uma opção. Tentando de novo de outro jeito...");
             }
-            // winget returns non-zero for "already installed"; availability is checked afterwards.
-            Log("winget terminou com código " + code);
+            if (code == InvalidArguments)
+                Log("  O winget deste PC está desatualizado. Abra a Microsoft Store, atualize o \"Instalador de Aplicativo\" (App Installer) e rode o instalador de novo.");
         }
 
         static bool HaveVisualStudio()
