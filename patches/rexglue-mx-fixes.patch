@@ -1,6 +1,6 @@
 diff -ru --strip-trailing-cr a/include/rex/graphics/d3d12/command_processor.h b/include/rex/graphics/d3d12/command_processor.h
---- a/include/rex/graphics/d3d12/command_processor.h	2026-11-13 23:19:30.641688000 -0300
-+++ b/include/rex/graphics/d3d12/command_processor.h	2026-11-13 23:19:30.663732100 -0300
+--- a/include/rex/graphics/d3d12/command_processor.h	2026-11-13 23:48:21.633328100 -0300
++++ b/include/rex/graphics/d3d12/command_processor.h	2026-11-13 23:48:21.656369200 -0300
 @@ -221,6 +221,11 @@
                   IndexBufferInfo* index_buffer_info, bool major_mode_explicit) override;
    bool IssueCopy() override;
@@ -31,8 +31,8 @@ diff -ru --strip-trailing-cr a/include/rex/graphics/d3d12/command_processor.h b/
    static constexpr size_t kMaxReadbackBuffers = 256;
    static constexpr uint64_t kReadbackBufferEvictionAgeFrames = 60;
 diff -ru --strip-trailing-cr a/src/graphics/d3d12/command_processor.cpp b/src/graphics/d3d12/command_processor.cpp
---- a/src/graphics/d3d12/command_processor.cpp	2026-11-13 23:19:30.119866000 -0300
-+++ b/src/graphics/d3d12/command_processor.cpp	2026-11-13 23:19:30.161476600 -0300
+--- a/src/graphics/d3d12/command_processor.cpp	2026-11-13 23:48:21.148182500 -0300
++++ b/src/graphics/d3d12/command_processor.cpp	2026-11-13 23:48:21.172720700 -0300
 @@ -14,7 +14,9 @@
  #include <cstdarg>
  #include <cstring>
@@ -43,7 +43,7 @@ diff -ru --strip-trailing-cr a/src/graphics/d3d12/command_processor.cpp b/src/gr
  #include <sstream>
  #include <thread>
  #include <utility>
-@@ -55,6 +57,19 @@
+@@ -55,6 +57,31 @@
                      "Offload the CPU memcpy of readback resolve results to a worker thread")
      .lifecycle(rex::cvar::Lifecycle::kHotReload);
  
@@ -52,6 +52,18 @@ diff -ru --strip-trailing-cr a/src/graphics/d3d12/command_processor.cpp b/src/gr
 +// mx_alive performance option: CPU readback of very large resolves (mostly
 +// full-screen / terrain render targets that only the GPU samples again) costs
 +// tens of MB of copies per frame. 0 = read back everything (accurate default).
++// mx_alive: what to do when the double-buffered resolve readback buffer that
++// would be read is not ready (never written, or its GPU copy still in flight).
++//  skip: don't stall; keep the last good CPU copy and update next time.
++//  wait: stall until the data is ready (accurate, slow in heavy scenes).
++//  off:  original behaviour, no stall (default). Readback buffers are now
++//        created zeroed, so a not-yet-written buffer yields zeros instead of
++//        leftover driver memory (which caused garbage geometry on NVIDIA).
++REXCVAR_DEFINE_STRING(readback_resolve_inflight, "off", "GPU/D3D12",
++                      "Resolve readback not ready: skip (no stall), wait, or off")
++    .allowed({"skip", "wait", "off"})
++    .lifecycle(rex::cvar::Lifecycle::kHotReload);
++
 +REXCVAR_DEFINE_UINT32(readback_resolve_max_kb, 0, "GPU/D3D12",
 +                      "Skip CPU readback of resolves larger than this many KB (0 = no limit)")
 +    .lifecycle(rex::cvar::Lifecycle::kHotReload);
@@ -63,7 +75,7 @@ diff -ru --strip-trailing-cr a/src/graphics/d3d12/command_processor.cpp b/src/gr
  namespace rex::graphics::d3d12 {
  
  // Generated with `xb buildshaders`.
-@@ -2575,6 +2590,33 @@
+@@ -2575,6 +2602,33 @@
    }
    // Must not call anything that can change the descriptor heap from now on!
  
@@ -97,7 +109,16 @@ diff -ru --strip-trailing-cr a/src/graphics/d3d12/command_processor.cpp b/src/gr
    // Ensure vertex buffers are resident.
    const Shader::ConstantRegisterMap& constant_map_vertex = vertex_shader->constant_register_map();
    for (uint32_t i = 0; i < rex::countof(constant_map_vertex.vertex_fetch_bitmap); ++i) {
-@@ -2977,6 +3019,29 @@
+@@ -2896,7 +2950,7 @@
+     ui::d3d12::util::FillBufferResourceDesc(buffer_desc, size, D3D12_RESOURCE_FLAG_NONE);
+     ID3D12Resource* buffer = nullptr;
+     if (FAILED(device->CreateCommittedResource(
+-            &ui::d3d12::util::kHeapPropertiesReadback, provider.GetHeapFlagCreateNotZeroed(),
++            &ui::d3d12::util::kHeapPropertiesReadback, D3D12_HEAP_FLAG_NONE /* mx_alive: zeroed, see readback_resolve_inflight */,
+             &buffer_desc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&buffer)))) {
+       return false;
+     }
+@@ -2977,6 +3031,29 @@
    if (!BeginSubmission(true)) {
      return false;
    }
@@ -127,7 +148,7 @@ diff -ru --strip-trailing-cr a/src/graphics/d3d12/command_processor.cpp b/src/gr
    ReadbackResolveMode readback_mode = GetReadbackResolveMode(REXCVAR_GET(d3d12_readback_resolve));
    if (readback_mode == ReadbackResolveMode::kDisabled) {
      uint32_t written_address, written_length;
-@@ -2997,6 +3062,12 @@
+@@ -2997,6 +3074,12 @@
      return true;
    }
  
@@ -140,9 +161,12 @@ diff -ru --strip-trailing-cr a/src/graphics/d3d12/command_processor.cpp b/src/gr
    if (!memory_->TranslatePhysical(written_address)) {
      return true;
    }
-@@ -3021,8 +3092,16 @@
+@@ -3019,10 +3102,18 @@
+     ui::d3d12::util::FillBufferResourceDesc(buffer_desc, size, D3D12_RESOURCE_FLAG_NONE);
+     ID3D12Resource* buffer = nullptr;
      if (FAILED(device->CreateCommittedResource(
-             &ui::d3d12::util::kHeapPropertiesReadback, provider.GetHeapFlagCreateNotZeroed(),
+-            &ui::d3d12::util::kHeapPropertiesReadback, provider.GetHeapFlagCreateNotZeroed(),
++            &ui::d3d12::util::kHeapPropertiesReadback, D3D12_HEAP_FLAG_NONE /* mx_alive: zeroed, see readback_resolve_inflight */,
              &buffer_desc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&buffer)))) {
 -      REXGPU_ERROR("Failed to create a {} MB readback buffer", size >> 20);
 -      return true;
@@ -150,7 +174,7 @@ diff -ru --strip-trailing-cr a/src/graphics/d3d12/command_processor.cpp b/src/gr
 +      TrimReadbackBuffers(readback_buffers_, 0, resolve_key);
 +      TrimReadbackBuffers(memexport_readback_buffers_, 0, UINT64_MAX);
 +      if (FAILED(device->CreateCommittedResource(
-+              &ui::d3d12::util::kHeapPropertiesReadback, provider.GetHeapFlagCreateNotZeroed(),
++              &ui::d3d12::util::kHeapPropertiesReadback, D3D12_HEAP_FLAG_NONE /* mx_alive: zeroed, see readback_resolve_inflight */,
 +              &buffer_desc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&buffer)))) {
 +        REXGPU_ERROR("Failed to create a {} MB readback buffer", size >> 20);
 +        return true;
@@ -159,7 +183,7 @@ diff -ru --strip-trailing-cr a/src/graphics/d3d12/command_processor.cpp b/src/gr
      }
      if (rb.buffers[write_index]) {
        if (rb.mapped_data[write_index]) {
-@@ -3171,6 +3250,10 @@
+@@ -3171,6 +3262,10 @@
      deferred_command_list_.D3DCopyBufferRegion(rb.buffers[write_index], 0, shared_memory_buffer,
                                                 written_address, written_length);
    }
@@ -170,30 +194,60 @@ diff -ru --strip-trailing-cr a/src/graphics/d3d12/command_processor.cpp b/src/gr
  
    ReadbackResolveMode readback_mode = GetReadbackResolveMode(REXCVAR_GET(d3d12_readback_resolve));
    bool use_delayed_sync =
-@@ -3184,12 +3267,21 @@
- 
-   bool is_cache_miss = false;
-   if (use_delayed_sync && (!rb.buffers[read_index] || written_length > rb.sizes[read_index] ||
--                           !rb.mapped_data[read_index])) {
-+                           !rb.mapped_data[read_index] || !rb.submission_written[read_index] ||
-+                           rb.written_size[read_index] < written_length)) {
-     is_cache_miss = true;
-     read_index = write_index;
-     if (!AwaitAllQueueOperationsCompletion()) {
-       return true;
-     }
-+  } else if (use_delayed_sync) {
-+    // The previous copy may still be in flight (GPU behind, or the same target
-+    // resolved twice in one submission): wait for that submission only.
-+    // Local read only: CheckSubmissionFence relies on submission_completed_
-+    // advancing itself to reclaim allocators/descriptors.
-+    if (rb.submission_written[read_index] > submission_fence_->GetCompletedValue()) {
-+      CheckSubmissionFence(rb.submission_written[read_index]);
-+    }
+@@ -3182,17 +3277,45 @@
+     return true;
    }
  
-   bool should_copy = (readback_mode == ReadbackResolveMode::kSome) ? is_cache_miss : true;
-@@ -4873,20 +4965,71 @@
++  const std::string& inflight_mode = REXCVAR_GET(readback_resolve_inflight);
++  bool read_buffer_usable = rb.buffers[read_index] && written_length <= rb.sizes[read_index] &&
++                            rb.mapped_data[read_index];
++  bool read_buffer_ready = read_buffer_usable && rb.submission_written[read_index] &&
++                           rb.written_size[read_index] >= written_length &&
++                           rb.submission_written[read_index] <= submission_fence_->GetCompletedValue();
+   bool is_cache_miss = false;
+-  if (use_delayed_sync && (!rb.buffers[read_index] || written_length > rb.sizes[read_index] ||
+-                           !rb.mapped_data[read_index])) {
+-    is_cache_miss = true;
+-    read_index = write_index;
+-    if (!AwaitAllQueueOperationsCompletion()) {
+-      return true;
++  bool skip_copy = false;
++  if (use_delayed_sync) {
++    if (inflight_mode == "off") {
++      // Original behaviour.
++      if (!read_buffer_usable) {
++        is_cache_miss = true;
++        read_index = write_index;
++        if (!AwaitAllQueueOperationsCompletion()) {
++          return true;
++        }
++      }
++    } else if (inflight_mode == "wait") {
++      if (!read_buffer_usable || !rb.submission_written[read_index] ||
++          rb.written_size[read_index] < written_length) {
++        is_cache_miss = true;
++        read_index = write_index;
++        if (!AwaitAllQueueOperationsCompletion()) {
++          return true;
++        }
++      } else if (!read_buffer_ready) {
++        // Local read only: CheckSubmissionFence relies on submission_completed_
++        // advancing itself to reclaim allocators/descriptors.
++        CheckSubmissionFence(rb.submission_written[read_index]);
++      }
++    } else if (!read_buffer_ready) {
++      // skip: never stall the GPU thread. The CPU copy keeps its last good
++      // contents and is refreshed on the next resolve of this target.
++      skip_copy = true;
+     }
+   }
+ 
+-  bool should_copy = (readback_mode == ReadbackResolveMode::kSome) ? is_cache_miss : true;
++  bool should_copy = (readback_mode == ReadbackResolveMode::kSome) ? is_cache_miss : !skip_copy;
+   if (should_copy && rb.buffers[read_index] && written_length <= rb.sizes[read_index] &&
+       rb.mapped_data[read_index]) {
+     uint8_t* destination = memory_->TranslatePhysical(written_address);
+@@ -4873,20 +4996,71 @@
        ++it;
        continue;
      }
@@ -277,9 +331,18 @@ diff -ru --strip-trailing-cr a/src/graphics/d3d12/command_processor.cpp b/src/gr
    }
  }
  
+@@ -4902,7 +5076,7 @@
+     ui::d3d12::util::FillBufferResourceDesc(buffer_desc, size, D3D12_RESOURCE_FLAG_NONE);
+     ID3D12Resource* buffer;
+     if (FAILED(device->CreateCommittedResource(
+-            &ui::d3d12::util::kHeapPropertiesReadback, provider.GetHeapFlagCreateNotZeroed(),
++            &ui::d3d12::util::kHeapPropertiesReadback, D3D12_HEAP_FLAG_NONE /* mx_alive: zeroed, see readback_resolve_inflight */,
+             &buffer_desc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&buffer)))) {
+       REXGPU_ERROR("Failed to create a {} MB readback buffer", size >> 20);
+       return nullptr;
 diff -ru --strip-trailing-cr a/src/graphics/d3d12/render_target_cache.cpp b/src/graphics/d3d12/render_target_cache.cpp
---- a/src/graphics/d3d12/render_target_cache.cpp	2026-11-13 23:19:30.755390200 -0300
-+++ b/src/graphics/d3d12/render_target_cache.cpp	2026-11-13 23:19:30.785985000 -0300
+--- a/src/graphics/d3d12/render_target_cache.cpp	2026-11-13 23:48:21.762548500 -0300
++++ b/src/graphics/d3d12/render_target_cache.cpp	2026-11-13 23:48:21.785585100 -0300
 @@ -1608,7 +1608,13 @@
    if (FAILED(device->CreateCommittedResource(&ui::d3d12::util::kHeapPropertiesDefault,
                                               D3D12_HEAP_FLAG_NONE, &resource_desc, resource_state,
@@ -296,8 +359,8 @@ diff -ru --strip-trailing-cr a/src/graphics/d3d12/render_target_cache.cpp b/src/
    {
      std::u16string resource_name = rex::string::to_utf16(key.GetDebugName());
 diff -ru --strip-trailing-cr a/src/graphics/pipeline/texture/cache.cpp b/src/graphics/pipeline/texture/cache.cpp
---- a/src/graphics/pipeline/texture/cache.cpp	2026-11-13 23:19:30.256632900 -0300
-+++ b/src/graphics/pipeline/texture/cache.cpp	2026-11-13 23:19:30.286699300 -0300
+--- a/src/graphics/pipeline/texture/cache.cpp	2026-11-13 23:48:21.264380000 -0300
++++ b/src/graphics/pipeline/texture/cache.cpp	2026-11-13 23:48:21.285410500 -0300
 @@ -26,6 +26,8 @@
  #include <rex/logging.h>
  #include <rex/math.h>
@@ -327,8 +390,8 @@ diff -ru --strip-trailing-cr a/src/graphics/pipeline/texture/cache.cpp b/src/gra
    return true;
  }
 diff -ru --strip-trailing-cr a/src/graphics/shaders/bytecode/d3d12_5_1/resolve_full_16bpp_cs.h b/src/graphics/shaders/bytecode/d3d12_5_1/resolve_full_16bpp_cs.h
---- a/src/graphics/shaders/bytecode/d3d12_5_1/resolve_full_16bpp_cs.h	2026-11-13 23:19:30.389600900 -0300
-+++ b/src/graphics/shaders/bytecode/d3d12_5_1/resolve_full_16bpp_cs.h	2026-11-13 23:19:30.547046100 -0300
+--- a/src/graphics/shaders/bytecode/d3d12_5_1/resolve_full_16bpp_cs.h	2026-11-13 23:48:21.386568900 -0300
++++ b/src/graphics/shaders/bytecode/d3d12_5_1/resolve_full_16bpp_cs.h	2026-11-13 23:48:21.409597900 -0300
 @@ -63,15 +63,15 @@
  iadd r1.w, r1.w, l(0x3f800000)
  bfi r5.x, l(10), l(5), CB0[0][0].w, l(0)
