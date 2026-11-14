@@ -16,6 +16,176 @@ using System.Windows.Forms;
 
 namespace MxAliveLauncher
 {
+
+    // Localization: the UI is written in Brazilian Portuguese; English (US) is a
+    // lookup table. Exact matches first, then known phrases inside longer
+    // (concatenated) strings, longest first.
+    static class L
+    {
+        public static bool En;
+        static readonly Dictionary<string, string> Map = new Dictionary<string, string>
+        {
+            { "MX vs. ATV Alive - port nativo para PC", "MX vs. ATV Alive - native PC port" },
+            { "port nativo para PC", "native PC port" },
+            { "use sua própria cópia do jogo", "use your own copy of the game" },
+            { "Jogo", "Game" },
+            { "Vídeo", "Video" },
+            { "Controle", "Controller" },
+            { "Avançado", "Advanced" },
+            { "Arquivos", "Files" },
+            { "Pasta do jogo (com o default.xex)", "Game folder (with default.xex)" },
+            { "Procurar", "Browse" },
+            { "Detectar", "Scan" },
+            { "Idioma", "Language" },
+            { "Áudio", "Audio" },
+            { "Sem som (mudo)", "No sound (mute)" },
+            { "Limite de FPS", "FPS limit" },
+            { "30 FPS (console)", "30 FPS (console)" },
+            { "60 FPS (recomendado)", "60 FPS (recommended)" },
+            { "120 FPS (instável)", "120 FPS (unstable)" },
+            { "144 FPS (instável)", "144 FPS (unstable)" },
+            { "240 FPS (instável)", "240 FPS (unstable)" },
+            { "Sem limite (teste)", "Unlimited (test)" },
+            { "Bilinear (padrão)", "Bilinear (default)" },
+            { "AMD CAS (nitidez)", "AMD CAS (sharpening)" },
+            { "Tela cheia", "Fullscreen" },
+            { "Renderização", "Rendering" },
+            { "Padrão (rápido)", "Default (fast)" },
+            { "ROV (precisão, NVIDIA)", "ROV (accuracy, NVIDIA)" },
+            { "Cópia exata (sem piscar)", "Exact copy (no flicker)" },
+            { "ROV + cópia exata", "ROV + exact copy" },
+            { "60 FPS é o modo testado e estável.", "60 FPS is the tested, stable mode." },
+            { "O jogo é 720p: numa tela 1080p use Upscaling FSR para mais nitidez.", "The game is 720p: on a 1080p screen use FSR upscaling for a sharper image." },
+            { "Controles detectados", "Detected controllers" },
+            { "Driver de controle", "Controller driver" },
+            { "SDL3 - PS5, PS4, Switch, genéricos", "SDL3 - PS5, PS4, Switch, generic" },
+            { "XInput - só controle de Xbox", "XInput - Xbox controllers only" },
+            { "Teclado e mouse", "Keyboard and mouse" },
+            { "Mouse move a câmera", "Mouse moves the camera" },
+            { "Sensibilidade", "Sensitivity" },
+            { "Conecte o controle antes de clicar em JOGAR. Se o DualSense não\n", "Connect the controller before clicking PLAY. If the DualSense does not\n" },
+            { "responder, feche a Steam (o Steam Input pode prender o controle).", "respond, close Steam (Steam Input can grab the controller)." },
+            { "Nenhum controle conectado (teclado e mouse disponíveis)", "No controller connected (keyboard and mouse available)" },
+            { "Controle genérico", "Generic controller" },
+            { "Controle Xbox", "Xbox controller" },
+            { "Controle Sony", "Sony controller" },
+            { "Controle Nintendo", "Nintendo controller" },
+            { "Backup do save antes de jogar (recomendado)", "Back up the save before playing (recommended)" },
+            { "Cópia de vídeo assíncrona (mais FPS)", "Asynchronous video copy (more FPS)" },
+            { "Limpar o cache de shaders ao iniciar", "Clear the shader cache on start" },
+            { "Log detalhado (para investigar travamentos)", "Detailed log (to investigate crashes)" },
+            { "Para salvar o progresso, volte ao menu da carreira depois da\n", "To save progress, go back to the career menu after the\n" },
+            { "prova. Sair direto da tela de resultado não grava o save.", "event. Quitting from the results screen does not save." },
+            { "Abrir logs", "Open logs" },
+            { "Abrir saves", "Open saves" },
+            { "Backup agora", "Back up now" },
+            { "Instalar DLC...", "Install DLC..." },
+            { "Criar atalho", "Shortcut" },
+            { "Gerar relatório", "Create report" },
+            { "JOGAR", "PLAY" },
+            { "PARAR", "STOP" },
+            { "nenhuma instalada", "none installed" },
+            { " instalada(s)", " installed" },
+            { "carregando...", "loading..." },
+            { "default.xex não encontrado nesta pasta.", "default.xex not found in this folder." },
+            { "default.xex inválido ou ilegível.", "default.xex is invalid or unreadable." },
+            { "Versão diferente da testada  ", "Different version than tested  " },
+            { " (versão testada)", " (tested version)" },
+            { " (ATENÇÃO: versão não testada)", " (WARNING: untested version)" },
+            { "Jogo: ", "Game: " },
+            { "mx_alive.exe não encontrado. Rode tools\\build-game.bat primeiro.", "mx_alive.exe not found. Run tools\\build-game.bat first." },
+            { "Controles: ", "Controllers: " },
+            { " encontrado(s).", " found." },
+            { "  |  pasta: ", "  |  folder: " },
+            { "Iniciando: ", "Starting: " },
+            { " FPS, controle ", " FPS, controller " },
+            { "Falha ao abrir o jogo: ", "Failed to start the game: " },
+            { "O jogo já está aberto.", "The game is already running." },
+            { "Não dá para iniciar: confira a pasta do jogo.", "Can't start: check the game folder." },
+            { "Backup do save: ", "Save backup: " },
+            { "Cache de shaders apagado.", "Shader cache cleared." },
+            { "Não consegui apagar o cache: ", "Couldn't clear the cache: " },
+            { "Jogo encerrado pelo launcher.", "Game stopped by the launcher." },
+            { "Não consegui fechar o jogo: ", "Couldn't close the game: " },
+            { "Jogo fechado (código ", "Game closed (code " },
+            { "jogo> ", "game> " },
+            { "Nada para copiar ainda (nenhum save).", "Nothing to back up yet (no save)." },
+            { "Backup criado: ", "Backup created: " },
+            { "Backup falhou: ", "Backup failed: " },
+            { "Não consegui abrir a pasta: ", "Couldn't open the folder: " },
+            { "Atalho criado: ", "Shortcut created: " },
+            { "Não consegui criar o atalho: ", "Couldn't create the shortcut: " },
+            { "Relatório criado na Área de Trabalho: ", "Report saved to the Desktop: " },
+            { "Não consegui gerar o relatório: ", "Couldn't create the report: " },
+            { "Procurando DLCs em ", "Looking for DLC in " },
+            { "Instalando: ", "Installing: " },
+            { "Falhou: ", "Failed: " },
+            { "Erro ao ler a pasta: ", "Error reading the folder: " },
+            { " instalada(s), ", " installed, " },
+            { " ignorada(s) (não são DLC do Alive, ex.: itens de avatar)", " skipped (not Alive DLC, e.g. avatar items)" },
+            { " com erro", " with errors" },
+            { "Erro ao listar controles: ", "Error listing controllers: " },
+            { "pacote SVOD não suportado", "SVOD package not supported" },
+            { "Escolha a pasta do jogo (a que tem o default.xex)", "Choose the game folder (the one with default.xex)" },
+            { "Escolha a pasta com as DLCs do Xbox 360 (por exemplo a pasta 5451087B ou 00000002)", "Choose the folder with the Xbox 360 DLC (for example the 5451087B or 00000002 folder)" }
+        };
+        static List<KeyValuePair<string, string>> phrases;
+        static readonly Dictionary<Control, string> originals = new Dictionary<Control, string>();
+
+        public static void Init(string setting)
+        {
+            if (setting == "en") En = true;
+            else if (setting == "pt") En = false;
+            else En = System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName != "pt";
+        }
+
+        public static string T(string s)
+        {
+            if (!En || string.IsNullOrEmpty(s)) return s;
+            string exact;
+            if (Map.TryGetValue(s, out exact)) return exact;
+            if (phrases == null)
+            {
+                phrases = Map.Where(kv => kv.Key.Length >= 5).OrderByDescending(kv => kv.Key.Length).ToList();
+            }
+            foreach (var kv in phrases)
+            {
+                if (s.IndexOf(kv.Key, StringComparison.Ordinal) >= 0) s = s.Replace(kv.Key, kv.Value);
+            }
+            return s;
+        }
+
+        // Translates the static texts of a control tree (labels, buttons,
+        // check boxes, the window title). The original Portuguese text is kept
+        // so switching back works.
+        public static void ApplyTo(Control c, ICollection<Control> skip)
+        {
+            if (skip == null || !skip.Contains(c))
+            {
+                if (c is Label || c is ButtonBase || c is Form)
+                {
+                    string orig;
+                    if (!originals.TryGetValue(c, out orig))
+                    {
+                        orig = c.Text;
+                        originals[c] = orig;
+                    }
+                    c.Text = T(orig);
+                }
+                var combo = c as ComboBox;
+                if (combo != null)
+                {
+                    int sel = combo.SelectedIndex;
+                    for (int i = 0; i < combo.Items.Count; i++) combo.Items[i] = combo.Items[i];
+                    combo.SelectedIndex = sel;
+                }
+            }
+            foreach (Control child in c.Controls) ApplyTo(child, skip);
+            c.Invalidate();
+        }
+
+    }
+
     static class Theme
     {
         public static readonly Color Back = Color.FromArgb(18, 18, 20);
@@ -56,7 +226,7 @@ namespace MxAliveLauncher
             float k = Font.Size / Theme.Section.Size;
             using (var b = new SolidBrush(Theme.Accent))
                 e.Graphics.FillRectangle(b, 12 * k, 12 * k, Math.Max(3, 3 * k), 18 * k);
-            TextRenderer.DrawText(e.Graphics, title.ToUpperInvariant(), Font,
+            TextRenderer.DrawText(e.Graphics, L.T(title).ToUpperInvariant(), Font,
                 new Point((int)(20 * k), (int)(10 * k)), Theme.Text);
         }
     }
@@ -129,7 +299,7 @@ namespace MxAliveLauncher
     {
         public string Label, Value;
         public Option(string label, string value) { Label = label; Value = value; }
-        public override string ToString() { return Label; }
+        public override string ToString() { return L.T(Label); }
     }
 
     static class Native
@@ -365,6 +535,7 @@ namespace MxAliveLauncher
 
         TextBox gameDir;
         Label gameStatus, dlcStatus;
+        Button langButton;
         Button installDlc;
         ComboBox language, fps, upscaling, backend, gpuMode;
         CheckBox fullscreen, vsync, mnk, mnkMouse, backup, clearCache, debugLog, asyncReadback, mute;
@@ -385,6 +556,7 @@ namespace MxAliveLauncher
         {
             this.root = root;
             settings = new Settings(Path.Combine(root, "launcher.ini"));
+            L.Init(settings.Get("ui_lang", "auto"));
             saveRoot = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "mx_alive");
 
             Text = "MX vs. ATV Alive - port nativo para PC";
@@ -413,6 +585,7 @@ namespace MxAliveLauncher
             Load += delegate { FitRestoredSizeToScreen(); };
 
             LoadSettings();
+            ApplyLanguage();
             EventHandler syncMnk = delegate { mnkMouse.Enabled = sensitivity.Enabled = mnk.Checked; };
             mnk.CheckedChanged += syncMnk;
             syncMnk(null, EventArgs.Empty);
@@ -516,6 +689,25 @@ namespace MxAliveLauncher
             }
         }
 
+        // ---------- language ----------
+        void ApplyLanguage()
+        {
+            L.ApplyTo(this, new Control[] { gameStatus, dlcStatus, fpsLabel, langButton });
+            langButton.Text = L.En ? "PT" : "EN";
+        }
+
+        void ToggleLanguage()
+        {
+            L.En = !L.En;
+            settings.Set("ui_lang", L.En ? "en" : "pt");
+            settings.Save();
+            ApplyLanguage();
+            CheckGame();
+            UpdateDlcStatus(false);
+            ScanControllers();
+            if (game == null || game.HasExited) fpsLabel.Text = "";
+        }
+
         // ---------- layout helpers ----------
         static Label MakeLabel(Control parent, string text, int x, int y, int w = 152)
         {
@@ -581,6 +773,8 @@ namespace MxAliveLauncher
             };
             Controls.Add(header);
 
+            langButton = MakeButton(header, "EN", 852, 12, 52, 28);
+            langButton.Click += delegate { ToggleLanguage(); };
             banner = new PictureBox { SizeMode = PictureBoxSizeMode.Zoom, BackColor = Color.Black };
             banner.SetBounds(16, 13, 160, 122);
             header.Controls.Add(banner);
@@ -607,7 +801,7 @@ namespace MxAliveLauncher
             var browse = MakeButton(s, "Procurar", 338, 61, 82, 26);
             browse.Click += delegate
             {
-                using (var d = new FolderBrowserDialog { Description = "Escolha a pasta do jogo (a que tem o default.xex)", SelectedPath = gameDir.Text })
+                using (var d = new FolderBrowserDialog { Description = L.T("Escolha a pasta do jogo (a que tem o default.xex)"), SelectedPath = gameDir.Text })
                     if (d.ShowDialog(this) == DialogResult.OK) { gameDir.Text = d.SelectedPath; CheckGame(); }
             };
             gameStatus = new Label { ForeColor = Theme.Dim, BackColor = Color.Transparent, Font = Theme.Small };
@@ -670,7 +864,7 @@ namespace MxAliveLauncher
             controllers = new ListBox { BackColor = Theme.Field, ForeColor = Theme.Text, BorderStyle = BorderStyle.FixedSingle, Font = Theme.Small, IntegralHeight = false };
             controllers.SetBounds(16, 62, 316, 72);
             s.Controls.Add(controllers);
-            var rescan = MakeButton(s, "Procurar", 338, 62, 82, 28);
+            var rescan = MakeButton(s, "Detectar", 338, 62, 82, 28);
             rescan.Click += delegate { ScanControllers(); };
 
             MakeLabel(s, "Driver de controle", 16, 146);
@@ -821,7 +1015,7 @@ namespace MxAliveLauncher
             return true;
         }
 
-        void SetStatus(string text, Color c) { gameStatus.Text = text; gameStatus.ForeColor = c; }
+        void SetStatus(string text, Color c) { gameStatus.Text = L.T(text); gameStatus.ForeColor = c; }
 
         // Cover art and the "A" icon come from the game's own dashboard art
         // package (nxeart): the largest embedded JPEG and the 64x64 PNG.
@@ -934,7 +1128,7 @@ namespace MxAliveLauncher
             if (vid == 0x2DC8) return "8BitDo";
             if (vid == 0x0F0D) return "Hori";
             if (vid == 0x0E6F || vid == 0x24C6) return "PowerA / PDP";
-            return "Controle genérico" + (string.IsNullOrEmpty(fallback) ? "" : " - " + fallback);
+            return L.T("Controle genérico") + (string.IsNullOrEmpty(fallback) ? "" : " - " + fallback);
         }
 
         void ScanControllers()
@@ -955,7 +1149,7 @@ namespace MxAliveLauncher
                 }
             }
             catch (Exception ex) { Log("Erro ao listar controles: " + ex.Message); }
-            if (n == 0) controllers.Items.Add("Nenhum controle conectado (teclado e mouse disponíveis)");
+            if (n == 0) controllers.Items.Add(L.T("Nenhum controle conectado (teclado e mouse disponíveis)"));
             Log("Controles: " + n + " encontrado(s).");
         }
 
@@ -1037,7 +1231,7 @@ namespace MxAliveLauncher
                 Log("Iniciando: " + f + " FPS, controle " + Val(backend).ToUpperInvariant());
                 play.Enabled = false; play.BackColor = Theme.AccentDark;
                 stop.Enabled = true; stop.ForeColor = Theme.Text;
-                fpsLabel.Text = "carregando...";
+                fpsLabel.Text = L.T("carregando...");
                 tailPath = null; tailPos = 0;
                 tailTimer.Start();
             }
@@ -1157,7 +1351,7 @@ namespace MxAliveLauncher
         void UpdateDlcStatus(bool logList)
         {
             var names = InstalledDlcNames();
-            dlcStatus.Text = names.Count == 0 ? "nenhuma instalada" : names.Count + " instalada(s)";
+            dlcStatus.Text = L.T(names.Count == 0 ? "nenhuma instalada" : names.Count + " instalada(s)");
             dlcStatus.ForeColor = names.Count == 0 ? Theme.Dim : Theme.Good;
             if (logList && names.Count > 0) Log("DLC: " + string.Join(", ", names.ToArray()));
         }
@@ -1166,7 +1360,7 @@ namespace MxAliveLauncher
         {
             using (var d = new FolderBrowserDialog
             {
-                Description = "Escolha a pasta com as DLCs do Xbox 360 (por exemplo a pasta 5451087B ou 00000002)",
+                Description = L.T("Escolha a pasta com as DLCs do Xbox 360 (por exemplo a pasta 5451087B ou 00000002)"),
                 ShowNewFolderButton = false
             })
             {
@@ -1366,6 +1560,7 @@ namespace MxAliveLauncher
 
         void Log(string text)
         {
+            text = L.T(text);
             log.AppendText((log.TextLength > 0 ? Environment.NewLine : "") + text);
             if (log.TextLength > 60000) log.Text = log.Text.Substring(log.TextLength - 40000);
         }

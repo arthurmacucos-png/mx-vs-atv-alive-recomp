@@ -29,6 +29,155 @@ using System.Reflection;
 
 namespace MxAliveSetup
 {
+
+    // Localization: the UI is written in Brazilian Portuguese; English (US) is a
+    // lookup table. Exact matches first, then known phrases inside longer
+    // (concatenated) strings, longest first.
+    static class L
+    {
+        public static bool En;
+        static readonly Dictionary<string, string> Map = new Dictionary<string, string>
+        {
+            { "MX vs. ATV Alive - instalação", "MX vs. ATV Alive - setup" },
+            { "Port nativo para PC  ·  instalação em um clique", "Native PC port  ·  one-click setup" },
+            { "O jogo NÃO é baixado: você escolhe a pasta da SUA cópia de Xbox 360 (com o default.xex).", "The game is NOT downloaded: you choose the folder of YOUR Xbox 360 copy (with default.xex)." },
+            { "Instalar em", "Install to" },
+            { "Pasta do jogo", "Game folder" },
+            { "Procurar...", "Browse..." },
+            { "INSTALAR", "INSTALL" },
+            { "ATUALIZAR", "UPDATE" },
+            { "SÓ ATUALIZAR", "UPDATE ONLY" },
+            { "JOGAR", "PLAY" },
+            { "TENTAR DE NOVO", "TRY AGAIN" },
+            { "SÓ ATUALIZAR: baixa só o que mudou, sem mexer no jogo e nos saves.\nInternet e ~15 GB livres. F11 = tela cheia.", "UPDATE ONLY: downloads just what changed, without touching the game or saves.\nInternet and ~15 GB free. F11 = fullscreen." },
+            { "Conferir a sua cópia do jogo", "Check your copy of the game" },
+            { "Baixar o projeto", "Download the project" },
+            { "Instalar as ferramentas (Git, CMake, Ninja, LLVM, Visual Studio)", "Install the tools (Git, CMake, Ninja, LLVM, Visual Studio)" },
+            { "Baixar o rexglue-sdk", "Download rexglue-sdk" },
+            { "Compilar o rexglue com a correção da água", "Build rexglue with the water fix" },
+            { "Recompilar o jogo (30 a 60 min na primeira vez)", "Recompile the game (30 to 60 min the first time)" },
+            { "Criar o atalho e abrir o launcher", "Create the shortcut and open the launcher" },
+            { "Baixar a atualização do GitHub", "Download the update from GitHub" },
+            { "Preparar o rexglue para as novas correções", "Prepare rexglue for the new fixes" },
+            { "Recompilar o módulo gráfico", "Rebuild the graphics module" },
+            { "Instalar as DLLs novas no jogo", "Install the new DLLs into the game" },
+            { "Atualizar o atalho", "Update the shortcut" },
+            { "  (já estava pronto)", "  (already done)" },
+            { "Escolha a pasta do jogo e clique em INSTALAR.", "Choose the game folder and click INSTALL." },
+            { "Instalação encontrada. Clique em ATUALIZAR (o jogo e os saves não são alterados).", "Installation found. Click UPDATE (the game and saves are not changed)." },
+            { "Pronto! Atalho \"MX vs ATV Alive\" criado na Área de Trabalho.", "Done! \"MX vs ATV Alive\" shortcut created on the Desktop." },
+            { "Atualizado! Pode abrir o jogo pelo atalho.", "Updated! Open the game from the shortcut." },
+            { "Erro: ", "Error: " },
+            { "... (se o Windows pedir permissão, clique em Sim)", "... (if Windows asks for permission, click Yes)" },
+            { "Instalando ", "Installing " },
+            { " ainda instalando. Verifique se há um pedido de permissão na barra de tarefas.", " still installing. Check the taskbar for a permission prompt." },
+            { "Escolha onde instalar (evite pastas do OneDrive)", "Choose where to install (avoid OneDrive folders)" },
+            { "Escolha a pasta do MX vs. ATV Alive de Xbox 360 (a que tem o default.xex)", "Choose the Xbox 360 MX vs. ATV Alive folder (the one with default.xex)" },
+            { "Escolha a pasta onde o MX vs. ATV Alive já está instalado (a que tem o MX Alive Launcher.exe)", "Choose the folder where MX vs. ATV Alive is already installed (the one with MX Alive Launcher.exe)" },
+            { "Escolha a pasta do jogo que contém o default.xex.", "Choose the game folder that contains default.xex." },
+            { "Instalar dentro do OneDrive vai sincronizar uns 8 GB com a nuvem. Continuar mesmo assim?", "Installing inside OneDrive will sync about 8 GB to the cloud. Continue anyway?" },
+            { "Outra janela do instalador ainda está aberta (ela pode estar esperando uma permissão do Windows na barra de tarefas).", "Another setup window is still open (it may be waiting for a Windows permission prompt on the taskbar)." },
+            { "Fechar a outra janela e continuar aqui?", "Close the other window and continue here?" },
+            { "Instalador já aberto", "Setup already open" },
+            { "Não encontrei uma instalação completa em:", "Couldn't find a complete installation in:" },
+            { "Para atualizar, a pasta precisa ter o jogo já compilado", "To update, the folder must contain the already compiled game" },
+            { "Se a instalação nunca terminou, use INSTALAR.", "If the installation never finished, use INSTALL." },
+            { "Atualizar", "Update" },
+            { "O log completo foi salvo em:", "The full log was saved to:" },
+            { "Mande esse arquivo para quem estiver te ajudando.", "Send this file to whoever is helping you." },
+            { "Erro na instalação", "Setup error" },
+            { "Erro na atualização", "Update error" },
+            { "Esta cópia não é a versão suportada (Xbox 360 USA/Europa, Title 5451087B, Media 5306E1D5).", "This copy is not the supported version (Xbox 360 USA/Europe, Title 5451087B, Media 5306E1D5)." },
+            { " não ficou disponível. Reinicie o PC e rode o instalador de novo.", " is not available. Restart the PC and run the setup again." },
+            { "Visual Studio Build Tools (C++) não foi instalado. Reinicie o PC e rode de novo.", "Visual Studio Build Tools (C++) was not installed. Restart the PC and run it again." },
+            { "Falha ao baixar o rexglue-sdk (confira a internet).", "Failed to download rexglue-sdk (check your internet)." },
+            { "Falha ao copiar os arquivos do jogo.", "Failed to copy the game files." },
+            { "Falha ao compilar o rexglue. Veja o log.", "Failed to build rexglue. See the log." },
+            { "Falha ao recompilar o jogo. Veja o log.", "Failed to recompile the game. See the log." },
+            { "Falha ao recompilar o rexglue. Veja o log.", "Failed to rebuild rexglue. See the log." },
+            { "Falha ao preparar o rexglue-sdk.", "Failed to prepare rexglue-sdk." },
+            { "rexglue-sdk não encontrado em ", "rexglue-sdk not found in " },
+            { "Feche o jogo e o launcher antes de atualizar.", "Close the game and the launcher before updating." },
+            { " não foi encontrado. Faça a instalação completa em outra pasta.", " was not found. Do a full installation in another folder." },
+            { "Feche o launcher e o jogo antes de atualizar (", "Close the launcher and the game before updating (" },
+            { " está em uso).", " is in use)." },
+            { "O ZIP baixado não tem a correção da água", "The downloaded ZIP does not have the water fix" },
+            { "Este instalador ainda não tem o endereço do repositório configurado. Baixe o projeto em ZIP, extraia e rode o instalador de dentro da pasta.", "This setup has no repository address configured. Download the project as a ZIP, extract it and run the setup from inside the folder." },
+            { "Copiando os arquivos do jogo para ", "Copying the game files to " },
+            { "Usando a pasta do projeto: ", "Using the project folder: " },
+            { "Projeto extraído em ", "Project extracted to " },
+            { "Baixando ", "Downloading " },
+            { "Atualizado: ", "Updated: " },
+            { "Atalho criado: ", "Shortcut created: " },
+            { "  Se aparecer um pedido de permissão do Windows (escudo azul/amarelo), clique em SIM.", "  If a Windows permission prompt appears (blue/yellow shield), click YES." },
+            { "  Ele pode abrir escondido: confira a barra de tarefas se nada acontecer.", "  It may open hidden: check the taskbar if nothing happens." },
+            { " está demorando mais de 15 minutos. Continuando a aguardar...", " is taking more than 15 minutes. Still waiting..." },
+            { "winget terminou com código ", "winget finished with code " },
+            { "Instalando Visual Studio 2022 Build Tools (C++). Pode levar 10-20 minutos.", "Installing Visual Studio 2022 Build Tools (C++). This can take 10-20 minutes." }
+        };
+        static List<KeyValuePair<string, string>> phrases;
+        static readonly Dictionary<Control, string> originals = new Dictionary<Control, string>();
+
+        public static void Init(string setting)
+        {
+            if (setting == "en") En = true;
+            else if (setting == "pt") En = false;
+            else En = System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName != "pt";
+        }
+
+        public static string T(string s)
+        {
+            if (!En || string.IsNullOrEmpty(s)) return s;
+            string exact;
+            if (Map.TryGetValue(s, out exact)) return exact;
+            if (phrases == null)
+            {
+                phrases = Map.Where(kv => kv.Key.Length >= 5).OrderByDescending(kv => kv.Key.Length).ToList();
+            }
+            foreach (var kv in phrases)
+            {
+                if (s.IndexOf(kv.Key, StringComparison.Ordinal) >= 0) s = s.Replace(kv.Key, kv.Value);
+            }
+            return s;
+        }
+
+        // Translates the static texts of a control tree (labels, buttons,
+        // check boxes, the window title). The original Portuguese text is kept
+        // so switching back works.
+        public static void ApplyTo(Control c, ICollection<Control> skip)
+        {
+            if (skip == null || !skip.Contains(c))
+            {
+                if (c is Label || c is ButtonBase || c is Form)
+                {
+                    string orig;
+                    if (!originals.TryGetValue(c, out orig))
+                    {
+                        orig = c.Text;
+                        originals[c] = orig;
+                    }
+                    c.Text = T(orig);
+                }
+                var combo = c as ComboBox;
+                if (combo != null)
+                {
+                    int sel = combo.SelectedIndex;
+                    for (int i = 0; i < combo.Items.Count; i++) combo.Items[i] = combo.Items[i];
+                    combo.SelectedIndex = sel;
+                }
+            }
+            foreach (Control child in c.Controls) ApplyTo(child, skip);
+            c.Invalidate();
+        }
+
+        public static DialogResult Msg(IWin32Window owner, string text, string caption,
+                                       MessageBoxButtons buttons, MessageBoxIcon icon)
+        {
+            return MessageBox.Show(owner, T(text), T(caption), buttons, icon);
+        }
+
+    }
+
     static class Config
     {
         // Repository that holds this project (GitHub "Download ZIP" of the default branch).
@@ -67,12 +216,45 @@ namespace MxAliveSetup
         TextBox installDir, gameDir, log;
         Label status;
         ProgressBar bar;
-        Button install, updateOnly, browseInstall, browseGame;
+        Button install, updateOnly, browseInstall, browseGame, langButton;
+
+        static string LanguageFile()
+        {
+            return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                                @"MXAliveSetup\lang.txt");
+        }
+
+        static void LoadLanguage()
+        {
+            string setting = "auto";
+            try { if (File.Exists(LanguageFile())) setting = File.ReadAllText(LanguageFile()).Trim(); } catch { }
+            L.Init(setting);
+        }
+
+        static void SaveLanguage()
+        {
+            try
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(LanguageFile()));
+                File.WriteAllText(LanguageFile(), L.En ? "en" : "pt");
+            }
+            catch { }
+        }
+
+        void ApplyLanguage()
+        {
+            var skip = new List<Control>(stepLabels);
+            skip.Add(status);
+            skip.Add(langButton);
+            L.ApplyTo(this, skip);
+            langButton.Text = L.En ? "PT" : "EN";
+        }
         StreamWriter logFile;
         string logPath;
 
         public SetupForm()
         {
+            LoadLanguage();
             Text = "MX vs. ATV Alive - instalação";
             BackColor = Theme.Back; ForeColor = Theme.Text;
             Font = new Font("Segoe UI", 9.5f);
@@ -135,7 +317,19 @@ namespace MxAliveSetup
                 if (found != null) installDir.Text = found;
             }
 
+            langButton = new Button { Text = "EN", FlatStyle = FlatStyle.Flat, BackColor = Theme.Field, ForeColor = Theme.Text, Location = new Point(684, 18), Size = new Size(52, 28), Cursor = Cursors.Hand };
+            langButton.FlatAppearance.BorderColor = Theme.Border;
+            langButton.Click += delegate
+            {
+                L.En = !L.En;
+                SaveLanguage();
+                ApplyLanguage();
+                RefreshMode();
+            };
+            Controls.Add(langButton);
             installDir.TextChanged += delegate { RefreshMode(); };
+            RefreshMode();
+            ApplyLanguage();
             RefreshMode();
             WrapInScalableContent();
             Load += delegate { FitToScreen(); };
@@ -291,7 +485,7 @@ namespace MxAliveSetup
                 string found = FindInstall();
                 if (found == null)
                 {
-                    using (var d = new FolderBrowserDialog { Description = "Escolha a pasta onde o MX vs. ATV Alive já está instalado (a que tem o MX Alive Launcher.exe)" })
+                    using (var d = new FolderBrowserDialog { Description = L.T("Escolha a pasta onde o MX vs. ATV Alive já está instalado (a que tem o MX Alive Launcher.exe)") })
                     {
                         if (d.ShowDialog(this) != DialogResult.OK) return;
                         found = d.SelectedPath;
@@ -299,7 +493,7 @@ namespace MxAliveSetup
                 }
                 if (!IsInstalled(found))
                 {
-                    MessageBox.Show(this, "Não encontrei uma instalação completa em:\n" + found +
+                    L.Msg(this, "Não encontrei uma instalação completa em:\n" + found +
                         "\n\nPara atualizar, a pasta precisa ter o jogo já compilado (out\\build\\win-amd64-release\\mx_alive.exe). " +
                         "Se a instalação nunca terminou, use INSTALAR.", "Atualizar", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     return;
@@ -319,7 +513,7 @@ namespace MxAliveSetup
         {
             if (install == null) return;
             updateMode = IsInstalled(installDir.Text.Trim());
-            install.Text = updateMode ? "ATUALIZAR" : "INSTALAR";
+            install.Text = L.T(updateMode ? "ATUALIZAR" : "INSTALAR");
             if (updateOnly != null) updateOnly.Visible = !updateMode;
             gameDir.Enabled = browseGame.Enabled = !updateMode;
             var names = updateMode ? updateStepNames : stepNames;
@@ -328,13 +522,13 @@ namespace MxAliveSetup
                 stepLabels[i].Visible = stepIcons[i].Visible = i < names.Length;
                 if (i < names.Length)
                 {
-                    stepLabels[i].Text = names[i]; stepLabels[i].ForeColor = Theme.Dim;
+                    stepLabels[i].Text = L.T(names[i]); stepLabels[i].ForeColor = Theme.Dim;
                     stepIcons[i].Text = "•"; stepIcons[i].ForeColor = Theme.Dim;
                 }
             }
-            status.Text = updateMode
+            status.Text = L.T(updateMode
                 ? "Instalação encontrada. Clique em ATUALIZAR (o jogo e os saves não são alterados)."
-                : "Escolha a pasta do jogo e clique em INSTALAR.";
+                : "Escolha a pasta do jogo e clique em INSTALAR.");
         }
 
         static string DefaultInstallDir()
@@ -354,7 +548,7 @@ namespace MxAliveSetup
 
         void PickFolder(TextBox box, string description)
         {
-            using (var d = new FolderBrowserDialog { Description = description, SelectedPath = box.Text })
+            using (var d = new FolderBrowserDialog { Description = L.T(description), SelectedPath = box.Text })
                 if (d.ShowDialog(this) == DialogResult.OK) box.Text = d.SelectedPath;
         }
 
@@ -363,6 +557,7 @@ namespace MxAliveSetup
 
         void Log(string line)
         {
+            line = L.T(line);
             if (line == null) return;
             lock (this) { if (logFile != null) { logFile.WriteLine(line); logFile.Flush(); } }
             Ui(() =>
@@ -379,7 +574,7 @@ namespace MxAliveSetup
                 var icon = stepIcons[i]; var lbl = stepLabels[i];
                 if (state == "run") { icon.Text = "►"; icon.ForeColor = Theme.Accent; lbl.ForeColor = Theme.Text; status.Text = lbl.Text + "..."; bar.Value = Math.Min(bar.Maximum, i * 10 + 2); }
                 else if (state == "ok") { icon.Text = "✓"; icon.ForeColor = Theme.Good; lbl.ForeColor = Theme.Text; bar.Value = Math.Min(bar.Maximum, (i + 1) * 10); }
-                else if (state == "skip") { icon.Text = "✓"; icon.ForeColor = Theme.Dim; lbl.Text = lbl.Text + "  (já estava pronto)"; bar.Value = Math.Min(bar.Maximum, (i + 1) * 10); }
+                else if (state == "skip") { icon.Text = "✓"; icon.ForeColor = Theme.Dim; lbl.Text = lbl.Text + L.T("  (já estava pronto)"); bar.Value = Math.Min(bar.Maximum, (i + 1) * 10); }
                 else if (state == "fail") { icon.Text = "✗"; icon.ForeColor = Theme.Bad; lbl.ForeColor = Theme.Bad; }
             });
         }
@@ -456,11 +651,11 @@ namespace MxAliveSetup
             updateMode = IsInstalled(root);
             if (!updateMode && (game.Length == 0 || !File.Exists(Path.Combine(game, "default.xex"))))
             {
-                MessageBox.Show(this, "Escolha a pasta do jogo que contém o default.xex.", "Pasta do jogo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                L.Msg(this, "Escolha a pasta do jogo que contém o default.xex.", "Pasta do jogo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
             if (root.IndexOf("OneDrive", StringComparison.OrdinalIgnoreCase) >= 0 &&
-                MessageBox.Show(this, "Instalar dentro do OneDrive vai sincronizar uns 8 GB com a nuvem. Continuar mesmo assim?", "OneDrive", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
+                L.Msg(this, "Instalar dentro do OneDrive vai sincronizar uns 8 GB com a nuvem. Continuar mesmo assim?", "OneDrive", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
                 return;
 
             // Another setup window (e.g. one stuck waiting for a UAC prompt) still
@@ -588,9 +783,9 @@ namespace MxAliveSetup
                 Log("PRONTO!");
                 Ui(() =>
                 {
-                    status.Text = "Pronto! Atalho \"MX vs ATV Alive\" criado na Área de Trabalho.";
+                    status.Text = L.T("Pronto! Atalho \"MX vs ATV Alive\" criado na Área de Trabalho.");
                     status.ForeColor = Theme.Good;
-                    install.Text = "JOGAR"; install.Enabled = true;
+                    install.Text = L.T("JOGAR"); install.Enabled = true;
                     install.Click += delegate { Process.Start(new ProcessStartInfo(launcher) { WorkingDirectory = root }); Close(); };
                 });
                 Process.Start(new ProcessStartInfo(launcher) { WorkingDirectory = root });
@@ -602,12 +797,12 @@ namespace MxAliveSetup
                 SetStep(Math.Min(step, stepNames.Length - 1), "fail");
                 Ui(() =>
                 {
-                    status.Text = "Erro: " + ex.Message;
+                    status.Text = L.T("Erro: " + ex.Message);
                     status.ForeColor = Theme.Bad;
-                    install.Text = "TENTAR DE NOVO"; install.Enabled = true;
+                    install.Text = L.T("TENTAR DE NOVO"); install.Enabled = true;
                     browseGame.Enabled = browseInstall.Enabled = true;
                     installDir.ReadOnly = gameDir.ReadOnly = false;
-                    MessageBox.Show(this, ex.Message + "\n\nO log completo foi salvo em:\n" + logPath +
+                    L.Msg(this, ex.Message + "\n\nO log completo foi salvo em:\n" + logPath +
                         "\n\nMande esse arquivo para quem estiver te ajudando.", "Erro na instalação",
                         MessageBoxButtons.OK, MessageBoxIcon.Error);
                 });
@@ -669,9 +864,9 @@ namespace MxAliveSetup
                 Log("ATUALIZADO!");
                 Ui(() =>
                 {
-                    status.Text = "Atualizado! Pode abrir o jogo pelo atalho.";
+                    status.Text = L.T("Atualizado! Pode abrir o jogo pelo atalho.");
                     status.ForeColor = Theme.Good;
-                    install.Text = "JOGAR"; install.Enabled = true;
+                    install.Text = L.T("JOGAR"); install.Enabled = true;
                     install.Click += delegate { Process.Start(new ProcessStartInfo(launcher) { WorkingDirectory = root }); Close(); };
                 });
             }
@@ -682,11 +877,11 @@ namespace MxAliveSetup
                 SetStep(Math.Min(step, updateStepNames.Length - 1), "fail");
                 Ui(() =>
                 {
-                    status.Text = "Erro: " + ex.Message;
+                    status.Text = L.T("Erro: " + ex.Message);
                     status.ForeColor = Theme.Bad;
-                    install.Text = "TENTAR DE NOVO"; install.Enabled = true;
+                    install.Text = L.T("TENTAR DE NOVO"); install.Enabled = true;
                     browseInstall.Enabled = true; installDir.ReadOnly = false;
-                    MessageBox.Show(this, ex.Message + "\n\nO log completo foi salvo em:\n" + logPath +
+                    L.Msg(this, ex.Message + "\n\nO log completo foi salvo em:\n" + logPath +
                         "\n\nMande esse arquivo para quem estiver te ajudando.", "Erro na atualização",
                         MessageBoxButtons.OK, MessageBoxIcon.Error);
                 });
@@ -749,7 +944,7 @@ namespace MxAliveSetup
             Log("Instalando " + id + " ...");
             Log("  Se aparecer um pedido de permissão do Windows (escudo azul/amarelo), clique em SIM.");
             Log("  Ele pode abrir escondido: confira a barra de tarefas se nada acontecer.");
-            Ui(() => status.Text = "Instalando " + id + "... (se o Windows pedir permissão, clique em Sim)");
+            Ui(() => status.Text = L.T("Instalando " + id + "... (se o Windows pedir permissão, clique em Sim)"));
             // Visible console window, no output redirection: winget can stall when its
             // output is piped, and the user sees progress and any prompt.
             string args = "install --id " + id + " -e --accept-package-agreements --accept-source-agreements --disable-interactivity " +
@@ -765,7 +960,7 @@ namespace MxAliveSetup
                 if (!p.WaitForExit(15 * 60 * 1000))
                 {
                     Log("  " + id + " está demorando mais de 15 minutos. Continuando a aguardar...");
-                    Ui(() => status.Text = id + " ainda instalando. Verifique se há um pedido de permissão na barra de tarefas.");
+                    Ui(() => status.Text = L.T(id + " ainda instalando. Verifique se há um pedido de permissão na barra de tarefas."));
                     p.WaitForExit();
                 }
                 code = p.ExitCode;
