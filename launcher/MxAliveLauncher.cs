@@ -1461,6 +1461,9 @@ namespace MxAliveLauncher
             // The player's own name (gamertag) applies offline and online.
             string who = netName.Text.Trim().Replace("\"", "");
             if (who.Length > 0) a.Append(" ").Append(Q("--net_name=" + who));
+            // Creator tag: only a launcher.ini that holds the creator key gets it.
+            string creatorKey = settings.Get("creator_key", "");
+            if (creatorKey.Length > 0) a.Append(" --net_creator_key=").Append(creatorKey);
             string nm = Val(netMode);
             string netPort = settings.Get("net_port", "36015");
             if (nm == "join" && netHost.Text.Trim().Length == 0)

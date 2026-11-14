@@ -1,5 +1,5 @@
---- a/include/rex/graphics/d3d12/command_processor.h	2026-11-14 13:24:30.369490900 -0300
-+++ b/include/rex/graphics/d3d12/command_processor.h	2026-11-14 13:24:30.591753000 -0300
+--- a/include/rex/graphics/d3d12/command_processor.h	2026-11-14 13:28:03.850721400 -0300
++++ b/include/rex/graphics/d3d12/command_processor.h	2026-11-14 13:28:04.109028700 -0300
 @@ -11,6 +11,7 @@
  
  #pragma once
@@ -68,7 +68,7 @@
  
    // Offloads the CPU memcpy of readback resolve results to a worker thread so
 --- a/include/rex/hook.h	2026-08-21 19:10:13.000000000 -0300
-+++ b/include/rex/hook.h	2026-11-14 13:24:30.764137500 -0300
++++ b/include/rex/hook.h	2026-11-14 13:28:04.303597800 -0300
 @@ -39,9 +39,20 @@
      rex::ppc::HostToGuestFunction<function>(ctx, base);          \
    }
@@ -94,7 +94,7 @@
  #endif
  
 --- a/include/rex/system/xmemory.h	2026-08-21 19:10:13.000000000 -0300
-+++ b/include/rex/system/xmemory.h	2026-11-14 13:24:30.946606600 -0300
++++ b/include/rex/system/xmemory.h	2026-11-14 13:28:04.488308000 -0300
 @@ -313,6 +313,10 @@
    bool Protect(uint32_t address, uint32_t size, uint32_t protect,
                 uint32_t* old_protect = nullptr) override;
@@ -143,8 +143,8 @@
  };
  
  }  // namespace rex::memory
---- a/src/graphics/d3d12/command_processor.cpp	2026-11-14 13:24:30.371997200 -0300
-+++ b/src/graphics/d3d12/command_processor.cpp	2026-11-14 13:24:31.250071200 -0300
+--- a/src/graphics/d3d12/command_processor.cpp	2026-11-14 13:28:03.852721500 -0300
++++ b/src/graphics/d3d12/command_processor.cpp	2026-11-14 13:28:04.796197500 -0300
 @@ -14,7 +14,9 @@
  #include <cstdarg>
  #include <cstring>
@@ -570,7 +570,7 @@
        REXGPU_ERROR("Failed to create a {} MB readback buffer", size >> 20);
        return nullptr;
 --- a/src/graphics/d3d12/render_target_cache.cpp	2026-08-21 19:10:13.000000000 -0300
-+++ b/src/graphics/d3d12/render_target_cache.cpp	2026-11-14 13:24:31.423589800 -0300
++++ b/src/graphics/d3d12/render_target_cache.cpp	2026-11-14 13:28:04.980507800 -0300
 @@ -1608,7 +1608,13 @@
    if (FAILED(device->CreateCommittedResource(&ui::d3d12::util::kHeapPropertiesDefault,
                                               D3D12_HEAP_FLAG_NONE, &resource_desc, resource_state,
@@ -587,7 +587,7 @@
    {
      std::u16string resource_name = rex::string::to_utf16(key.GetDebugName());
 --- a/src/graphics/pipeline/texture/cache.cpp	2026-08-21 19:10:13.000000000 -0300
-+++ b/src/graphics/pipeline/texture/cache.cpp	2026-11-14 13:24:31.741581500 -0300
++++ b/src/graphics/pipeline/texture/cache.cpp	2026-11-14 13:28:05.305717600 -0300
 @@ -26,6 +26,8 @@
  #include <rex/logging.h>
  #include <rex/math.h>
@@ -617,7 +617,7 @@
    return true;
  }
 --- a/src/graphics/shaders/bytecode/d3d12_5_1/resolve_full_16bpp_cs.h	2026-08-21 19:10:13.000000000 -0300
-+++ b/src/graphics/shaders/bytecode/d3d12_5_1/resolve_full_16bpp_cs.h	2026-11-14 13:24:31.927838000 -0300
++++ b/src/graphics/shaders/bytecode/d3d12_5_1/resolve_full_16bpp_cs.h	2026-11-14 13:28:05.489382200 -0300
 @@ -63,15 +63,15 @@
  iadd r1.w, r1.w, l(0x3f800000)
  bfi r5.x, l(10), l(5), CB0[0][0].w, l(0)
@@ -10842,7 +10842,7 @@
 +      1,   0,   0,   0
 +};
 --- a/src/kernel/CMakeLists.txt	2026-08-21 19:10:13.000000000 -0300
-+++ b/src/kernel/CMakeLists.txt	2026-11-14 13:24:32.113348700 -0300
++++ b/src/kernel/CMakeLists.txt	2026-11-14 13:28:05.677661300 -0300
 @@ -14,6 +14,7 @@
      xam/xam_locale.cpp
      xam/xam_msg.cpp
@@ -10852,7 +10852,7 @@
      xam/xam_nui.cpp
      xam/xam_party.cpp
 --- a/src/kernel/xam/apps/xgi_app.cpp	2026-08-21 19:10:13.000000000 -0300
-+++ b/src/kernel/xam/apps/xgi_app.cpp	2026-11-14 13:24:32.286938100 -0300
++++ b/src/kernel/xam/apps/xgi_app.cpp	2026-11-14 13:28:05.851550000 -0300
 @@ -12,6 +12,10 @@
  #include <rex/kernel/xam/apps/xgi_app.h>
  #include <rex/logging.h>
@@ -10947,7 +10947,7 @@
      }
      case 0x000B001D: {
 --- a/src/kernel/xam/apps/xlivebase_app.cpp	2026-08-21 19:10:13.000000000 -0300
-+++ b/src/kernel/xam/apps/xlivebase_app.cpp	2026-11-14 13:24:32.479207300 -0300
++++ b/src/kernel/xam/apps/xlivebase_app.cpp	2026-11-14 13:28:06.028010800 -0300
 @@ -11,6 +11,8 @@
  
  #include <rex/kernel/xam/apps/xlivebase_app.h>
@@ -10970,7 +10970,7 @@
        "Unimplemented XLIVEBASE message app={:08X}, msg={:08X}, arg1={:08X}, "
        "arg2={:08X}",
 --- a/src/kernel/xam/xam_enum.cpp	2026-08-21 19:10:13.000000000 -0300
-+++ b/src/kernel/xam/xam_enum.cpp	2026-11-14 13:24:32.658987000 -0300
++++ b/src/kernel/xam/xam_enum.cpp	2026-11-14 13:28:06.201579400 -0300
 @@ -1,4 +1,4 @@
 -/**
 +﻿/**
@@ -11022,7 +11022,7 @@
  
  u32 XamGetPrivateEnumStructureFromHandle_entry(u32 handle, mapped_u32 out_object_ptr) {
 --- a/src/kernel/xam/xam_misc.cpp	2026-08-21 19:10:13.000000000 -0300
-+++ b/src/kernel/xam/xam_misc.cpp	2026-11-14 13:24:32.830460200 -0300
++++ b/src/kernel/xam/xam_misc.cpp	2026-11-14 13:28:06.369795800 -0300
 @@ -243,7 +243,6 @@
  REX_EXPORT_STUB(__imp__XNetLogonGetServiceNetworkID);
  REX_EXPORT_STUB(__imp__XNetLogonGetState);
@@ -11051,7 +11051,7 @@
 +static rex::ppc::detail::PPCFuncRegistrar _ppc_reg___imp__XNetLogonGetTitleID(
 +    "__imp__XNetLogonGetTitleID", &__imp__XNetLogonGetTitleID);
 --- a/src/kernel/xam/xam_net.cpp	2026-08-21 19:10:13.000000000 -0300
-+++ b/src/kernel/xam/xam_net.cpp	2026-11-14 13:24:33.004859300 -0300
++++ b/src/kernel/xam/xam_net.cpp	2026-11-14 13:28:06.548159200 -0300
 @@ -32,6 +32,14 @@
  #include <rex/system/xsocket.h>
  #include <rex/system/xthread.h>
@@ -11811,7 +11811,7 @@
 +}
 +}  // namespace rex::kernel::xam
 --- a/src/kernel/xam/xam_notify.cpp	2026-08-21 19:10:13.000000000 -0300
-+++ b/src/kernel/xam/xam_notify.cpp	2026-11-14 13:24:33.181440500 -0300
++++ b/src/kernel/xam/xam_notify.cpp	2026-11-14 13:28:06.715190200 -0300
 @@ -16,6 +16,7 @@
  #include <rex/system/kernel_state.h>
  #include <rex/system/xnotifylistener.h>
@@ -11838,7 +11838,7 @@
    uint32_t handle = listener->handle();
  
 --- a/src/kernel/xam/xam_user.cpp	2026-08-21 19:10:13.000000000 -0300
-+++ b/src/kernel/xam/xam_user.cpp	2026-11-14 13:24:33.344293600 -0300
++++ b/src/kernel/xam/xam_user.cpp	2026-11-14 13:28:07.175930900 -0300
 @@ -12,6 +12,7 @@
  // Disable warnings about unused parameters for kernel functions
  #pragma GCC diagnostic ignored "-Wunused-parameter"
@@ -11922,7 +11922,7 @@
  }
  
 --- a/src/system/function_dispatcher.cpp	2026-08-21 19:10:13.000000000 -0300
-+++ b/src/system/function_dispatcher.cpp	2026-11-14 13:24:33.892547900 -0300
++++ b/src/system/function_dispatcher.cpp	2026-11-14 13:28:07.709279100 -0300
 @@ -13,6 +13,9 @@
   *              role as a function dispatch table rather than a CPU emulator.
   */
@@ -12029,7 +12029,7 @@
    FunctionDispatcher* dispatcher = GetBoundFunctionDispatcher();
    if (!dispatcher) {
 --- a/src/system/xmemory.cpp	2026-08-21 19:10:13.000000000 -0300
-+++ b/src/system/xmemory.cpp	2026-11-14 13:24:34.198023600 -0300
++++ b/src/system/xmemory.cpp	2026-11-14 13:28:08.001603100 -0300
 @@ -556,6 +556,14 @@
    // Will be rounded to physical page boundaries internally, so just pass 1 as
    // the length - guranteed not to cross page boundaries also.
@@ -12183,7 +12183,7 @@
              rex::sat_sub(i * system_page_size_, host_address_offset()) >> page_size_shift_;
 --- a/src/kernel/xam/net_relay.cpp	1969-12-31 21:00:00.000000000 -0300
 +++ b/src/kernel/xam/net_relay.cpp	1969-12-31 21:00:00.000000000 -0300
-@@ -0,0 +1,564 @@
+@@ -0,0 +1,616 @@
 +/**
 + * MX Alive online relay - see net_relay.h.
 + */
@@ -12203,6 +12203,8 @@
 +
 +#include <winsock2.h>  // NOLINT(build/include_order)
 +#include <ws2tcpip.h>  // NOLINT(build/include_order)
++#include <wincrypt.h>  // NOLINT(build/include_order)
++#include <cstdio>
 +
 +REXCVAR_DEFINE_STRING(net_mode, "off", "Net",
 +                      "Online relay: off, host (you are the server) or join");
@@ -12212,9 +12214,12 @@
 +bool rex_trace_exports = false;
 +REXCVAR_DEFINE_BOOL(scan_missing_functions, false, "Net", "List code pointers without a recompiled function (diagnostics)");
 +void rex_scan_missing_functions();
++REXCVAR_DEFINE_STRING(net_creator_key, "", "Net", "Creator key (enables the creator tag)");
 +REXCVAR_DEFINE_STRING(net_name, "", "Net", "Gamertag shown to other players");
 +
 +namespace rex::kernel::xam::netrelay {
++
++static std::string TagName(std::string n);  // creator tag handling, defined below
 +
 +namespace {
 +
@@ -12557,7 +12562,7 @@
 +    if (GetEnvironmentVariableA("USERNAME", user, ul)) s.name = user;
 +    if (s.name.empty()) s.name = "Piloto";
 +  }
-+  if (s.name.size() > 15) s.name.resize(15);
++  s.name = TagName(s.name);
 +  s.xuid = MakeXuid(s.name);
 +  uint16_t port = uint16_t(REXCVAR_GET(net_port));
 +
@@ -12635,10 +12640,57 @@
 +uint64_t LocalXuid() {
 +  return S().xuid;
 +}
-+std::string PlayerName() {
-+  std::string n = REXCVAR_GET(net_name);
++// Creator tag: only the holder of the creator key (its SHA-256 is below) gets
++// the "[DEV]" prefix; anyone else typing the tag in their name has it removed.
++static const char kCreatorKeySha256[] = "7612bddd33de7f1b6f3384a4563abaa2e102e083cc2aae8643a8d7433c38d65e";
++static const char kCreatorTag[] = "[DEV]";
++
++static bool IsCreator() {
++  static int cached = -1;
++  if (cached >= 0) return cached == 1;
++  cached = 0;
++  std::string key = REXCVAR_GET(net_creator_key);
++  if (key.empty()) return false;
++  HCRYPTPROV prov = 0;
++  HCRYPTHASH hash = 0;
++  BYTE digest[32];
++  DWORD len = sizeof(digest);
++  if (CryptAcquireContextA(&prov, nullptr, nullptr, PROV_RSA_AES, CRYPT_VERIFYCONTEXT)) {
++    if (CryptCreateHash(prov, CALG_SHA_256, 0, 0, &hash)) {
++      if (CryptHashData(hash, reinterpret_cast<const BYTE*>(key.data()), DWORD(key.size()), 0) &&
++          CryptGetHashParam(hash, HP_HASHVAL, digest, &len, 0)) {
++        char hex[65] = {};
++        for (int i = 0; i < 32; i++) std::snprintf(hex + i * 2, 3, "%02x", digest[i]);
++        if (std::string(hex) == kCreatorKeySha256) cached = 1;
++      }
++      CryptDestroyHash(hash);
++    }
++    CryptReleaseContext(prov, 0);
++  }
++  return cached == 1;
++}
++
++static std::string TagName(std::string n) {
++  // Remove the reserved tag (any case, repeated) from what the player typed.
++  for (;;) {
++    while (!n.empty() && n.front() == ' ') n.erase(0, 1);
++    if (n.size() >= 5 && _strnicmp(n.c_str(), kCreatorTag, 5) == 0)
++      n.erase(0, 5);
++    else
++      break;
++  }
++  if (IsCreator()) {
++    if (n.size() > 10) n.resize(10);
++    return std::string(kCreatorTag) + n;
++  }
 +  if (n.size() > 15) n.resize(15);
 +  return n;
++}
++
++std::string PlayerName() {
++  std::string n = REXCVAR_GET(net_name);
++  if (n.empty()) return IsCreator() ? std::string(kCreatorTag) : n;
++  return TagName(n);
 +}
 +std::string LocalName() {
 +  return S().name;
