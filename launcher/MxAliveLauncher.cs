@@ -65,6 +65,7 @@ namespace MxAliveLauncher
             { "Online: não consegui abrir a porta no roteador sozinho (", "Online: could not open the port on the router (" },
             { "). Amigos na mesma rede entram normal; pela internet, ative o UPnP no roteador ou use um app de rede virtual (Radmin VPN).", "). Friends on the same network can join; over the internet, enable UPnP on the router or use a virtual LAN app (Radmin VPN)." },
             { "Seu nome", "Your name" },
+            { "Nome do jogador", "Player name" },
             { "Online: sala criada. Passe para os amigos o seu IP: ", "Online: room created. Give your friends your IP: " },
             { " (libere a porta UDP ", " (forward UDP port " },
             { " no roteador se for pela internet)", " on the router when playing over the internet)" },
@@ -937,7 +938,7 @@ namespace MxAliveLauncher
             netHost = new TextBox { BackColor = Theme.Field, ForeColor = Theme.Text, BorderStyle = BorderStyle.FixedSingle };
             netHost.SetBounds(170, 168, 250, 24);
             s.Controls.Add(netHost);
-            MakeLabel(s, "Seu nome", 16, 196);
+            MakeLabel(s, "Nome do jogador", 16, 196);
             netName = new TextBox { BackColor = Theme.Field, ForeColor = Theme.Text, BorderStyle = BorderStyle.FixedSingle, MaxLength = 15 };
             netName.SetBounds(170, 196, 140, 24);
             s.Controls.Add(netName);
@@ -1457,6 +1458,9 @@ namespace MxAliveLauncher
             string db = Path.Combine(root, @"controllers\gamecontrollerdb.txt");
             if (File.Exists(db)) a.Append(" ").Append(Q("--hid_mappings_file=" + db));
 
+            // The player's own name (gamertag) applies offline and online.
+            string who = netName.Text.Trim().Replace("\"", "");
+            if (who.Length > 0) a.Append(" ").Append(Q("--net_name=" + who));
             string nm = Val(netMode);
             string netPort = settings.Get("net_port", "36015");
             if (nm == "join" && netHost.Text.Trim().Length == 0)
@@ -1468,8 +1472,6 @@ namespace MxAliveLauncher
             {
                 a.Append(" --net_mode=").Append(nm);
                 a.Append(" --net_port=").Append(netPort);
-                string who = netName.Text.Trim();
-                if (who.Length > 0) a.Append(" ").Append(Q("--net_name=" + who));
                 if (nm == "join")
                 {
                     string hostIp = DecodeRoomCode(netHost.Text.Trim());

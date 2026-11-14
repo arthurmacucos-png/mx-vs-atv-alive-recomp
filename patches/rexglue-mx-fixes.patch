@@ -1,5 +1,5 @@
---- a/include/rex/graphics/d3d12/command_processor.h	2026-11-14 13:00:11.901305900 -0300
-+++ b/include/rex/graphics/d3d12/command_processor.h	2026-11-14 13:00:12.164058200 -0300
+--- a/include/rex/graphics/d3d12/command_processor.h	2026-11-14 13:24:30.369490900 -0300
++++ b/include/rex/graphics/d3d12/command_processor.h	2026-11-14 13:24:30.591753000 -0300
 @@ -11,6 +11,7 @@
  
  #pragma once
@@ -68,7 +68,7 @@
  
    // Offloads the CPU memcpy of readback resolve results to a worker thread so
 --- a/include/rex/hook.h	2026-08-21 19:10:13.000000000 -0300
-+++ b/include/rex/hook.h	2026-11-14 13:00:12.418480600 -0300
++++ b/include/rex/hook.h	2026-11-14 13:24:30.764137500 -0300
 @@ -39,9 +39,20 @@
      rex::ppc::HostToGuestFunction<function>(ctx, base);          \
    }
@@ -94,7 +94,7 @@
  #endif
  
 --- a/include/rex/system/xmemory.h	2026-08-21 19:10:13.000000000 -0300
-+++ b/include/rex/system/xmemory.h	2026-11-14 13:00:12.602794700 -0300
++++ b/include/rex/system/xmemory.h	2026-11-14 13:24:30.946606600 -0300
 @@ -313,6 +313,10 @@
    bool Protect(uint32_t address, uint32_t size, uint32_t protect,
                 uint32_t* old_protect = nullptr) override;
@@ -143,8 +143,8 @@
  };
  
  }  // namespace rex::memory
---- a/src/graphics/d3d12/command_processor.cpp	2026-11-14 13:00:11.903311300 -0300
-+++ b/src/graphics/d3d12/command_processor.cpp	2026-11-14 13:00:12.921853700 -0300
+--- a/src/graphics/d3d12/command_processor.cpp	2026-11-14 13:24:30.371997200 -0300
++++ b/src/graphics/d3d12/command_processor.cpp	2026-11-14 13:24:31.250071200 -0300
 @@ -14,7 +14,9 @@
  #include <cstdarg>
  #include <cstring>
@@ -570,7 +570,7 @@
        REXGPU_ERROR("Failed to create a {} MB readback buffer", size >> 20);
        return nullptr;
 --- a/src/graphics/d3d12/render_target_cache.cpp	2026-08-21 19:10:13.000000000 -0300
-+++ b/src/graphics/d3d12/render_target_cache.cpp	2026-11-14 13:00:13.525667100 -0300
++++ b/src/graphics/d3d12/render_target_cache.cpp	2026-11-14 13:24:31.423589800 -0300
 @@ -1608,7 +1608,13 @@
    if (FAILED(device->CreateCommittedResource(&ui::d3d12::util::kHeapPropertiesDefault,
                                               D3D12_HEAP_FLAG_NONE, &resource_desc, resource_state,
@@ -587,7 +587,7 @@
    {
      std::u16string resource_name = rex::string::to_utf16(key.GetDebugName());
 --- a/src/graphics/pipeline/texture/cache.cpp	2026-08-21 19:10:13.000000000 -0300
-+++ b/src/graphics/pipeline/texture/cache.cpp	2026-11-14 13:00:14.000335000 -0300
++++ b/src/graphics/pipeline/texture/cache.cpp	2026-11-14 13:24:31.741581500 -0300
 @@ -26,6 +26,8 @@
  #include <rex/logging.h>
  #include <rex/math.h>
@@ -617,7 +617,7 @@
    return true;
  }
 --- a/src/graphics/shaders/bytecode/d3d12_5_1/resolve_full_16bpp_cs.h	2026-08-21 19:10:13.000000000 -0300
-+++ b/src/graphics/shaders/bytecode/d3d12_5_1/resolve_full_16bpp_cs.h	2026-11-14 13:00:14.194902500 -0300
++++ b/src/graphics/shaders/bytecode/d3d12_5_1/resolve_full_16bpp_cs.h	2026-11-14 13:24:31.927838000 -0300
 @@ -63,15 +63,15 @@
  iadd r1.w, r1.w, l(0x3f800000)
  bfi r5.x, l(10), l(5), CB0[0][0].w, l(0)
@@ -10842,7 +10842,7 @@
 +      1,   0,   0,   0
 +};
 --- a/src/kernel/CMakeLists.txt	2026-08-21 19:10:13.000000000 -0300
-+++ b/src/kernel/CMakeLists.txt	2026-11-14 13:00:14.387786600 -0300
++++ b/src/kernel/CMakeLists.txt	2026-11-14 13:24:32.113348700 -0300
 @@ -14,6 +14,7 @@
      xam/xam_locale.cpp
      xam/xam_msg.cpp
@@ -10852,7 +10852,7 @@
      xam/xam_nui.cpp
      xam/xam_party.cpp
 --- a/src/kernel/xam/apps/xgi_app.cpp	2026-08-21 19:10:13.000000000 -0300
-+++ b/src/kernel/xam/apps/xgi_app.cpp	2026-11-14 13:00:14.591138000 -0300
++++ b/src/kernel/xam/apps/xgi_app.cpp	2026-11-14 13:24:32.286938100 -0300
 @@ -12,6 +12,10 @@
  #include <rex/kernel/xam/apps/xgi_app.h>
  #include <rex/logging.h>
@@ -10947,7 +10947,7 @@
      }
      case 0x000B001D: {
 --- a/src/kernel/xam/apps/xlivebase_app.cpp	2026-08-21 19:10:13.000000000 -0300
-+++ b/src/kernel/xam/apps/xlivebase_app.cpp	2026-11-14 13:00:14.772969500 -0300
++++ b/src/kernel/xam/apps/xlivebase_app.cpp	2026-11-14 13:24:32.479207300 -0300
 @@ -11,6 +11,8 @@
  
  #include <rex/kernel/xam/apps/xlivebase_app.h>
@@ -10970,7 +10970,7 @@
        "Unimplemented XLIVEBASE message app={:08X}, msg={:08X}, arg1={:08X}, "
        "arg2={:08X}",
 --- a/src/kernel/xam/xam_enum.cpp	2026-08-21 19:10:13.000000000 -0300
-+++ b/src/kernel/xam/xam_enum.cpp	2026-11-14 13:00:14.986682300 -0300
++++ b/src/kernel/xam/xam_enum.cpp	2026-11-14 13:24:32.658987000 -0300
 @@ -1,4 +1,4 @@
 -/**
 +﻿/**
@@ -11022,7 +11022,7 @@
  
  u32 XamGetPrivateEnumStructureFromHandle_entry(u32 handle, mapped_u32 out_object_ptr) {
 --- a/src/kernel/xam/xam_misc.cpp	2026-08-21 19:10:13.000000000 -0300
-+++ b/src/kernel/xam/xam_misc.cpp	2026-11-14 13:00:15.165153200 -0300
++++ b/src/kernel/xam/xam_misc.cpp	2026-11-14 13:24:32.830460200 -0300
 @@ -243,7 +243,6 @@
  REX_EXPORT_STUB(__imp__XNetLogonGetServiceNetworkID);
  REX_EXPORT_STUB(__imp__XNetLogonGetState);
@@ -11051,7 +11051,7 @@
 +static rex::ppc::detail::PPCFuncRegistrar _ppc_reg___imp__XNetLogonGetTitleID(
 +    "__imp__XNetLogonGetTitleID", &__imp__XNetLogonGetTitleID);
 --- a/src/kernel/xam/xam_net.cpp	2026-08-21 19:10:13.000000000 -0300
-+++ b/src/kernel/xam/xam_net.cpp	2026-11-14 13:00:15.347856900 -0300
++++ b/src/kernel/xam/xam_net.cpp	2026-11-14 13:24:33.004859300 -0300
 @@ -32,6 +32,14 @@
  #include <rex/system/xsocket.h>
  #include <rex/system/xthread.h>
@@ -11811,7 +11811,7 @@
 +}
 +}  // namespace rex::kernel::xam
 --- a/src/kernel/xam/xam_notify.cpp	2026-08-21 19:10:13.000000000 -0300
-+++ b/src/kernel/xam/xam_notify.cpp	2026-11-14 13:00:15.568727200 -0300
++++ b/src/kernel/xam/xam_notify.cpp	2026-11-14 13:24:33.181440500 -0300
 @@ -16,6 +16,7 @@
  #include <rex/system/kernel_state.h>
  #include <rex/system/xnotifylistener.h>
@@ -11838,7 +11838,7 @@
    uint32_t handle = listener->handle();
  
 --- a/src/kernel/xam/xam_user.cpp	2026-08-21 19:10:13.000000000 -0300
-+++ b/src/kernel/xam/xam_user.cpp	2026-11-14 13:00:15.755060300 -0300
++++ b/src/kernel/xam/xam_user.cpp	2026-11-14 13:24:33.344293600 -0300
 @@ -12,6 +12,7 @@
  // Disable warnings about unused parameters for kernel functions
  #pragma GCC diagnostic ignored "-Wunused-parameter"
@@ -11870,10 +11870,13 @@
    return signin_state;
  }
  
-@@ -100,6 +108,12 @@
+@@ -100,6 +108,15 @@
    info->xuid = user_profile->xuid();
    info->signin_state = user_profile->signin_state();
    rex::string::copy_truncating(info->name, user_profile->name(), rex::countof(info->name));
++  if (!netrelay::PlayerName().empty()) {
++    rex::string::copy_truncating(info->name, netrelay::PlayerName(), rex::countof(info->name));
++  }
 +  if (netrelay::Active()) {
 +    info->signin_state = 2;
 +    info->unk08 = 1;  // dwInfoFlags: XUSER_INFO_FLAG_LIVE_ENABLED
@@ -11883,17 +11886,30 @@
    return X_E_SUCCESS;
  }
  
-@@ -113,7 +127,8 @@
+@@ -113,7 +130,9 @@
    }
  
    const auto& user_profile = REX_KERNEL_STATE()->user_profile();
 -  const auto& user_name = user_profile->name();
 +  std::string user_name = user_profile->name();
 +  if (netrelay::Active()) user_name = netrelay::LocalName();
++  else if (!netrelay::PlayerName().empty()) user_name = netrelay::PlayerName();
    rex::string::copy_truncating(buffer, user_name, std::min(buffer_len, uint32_t(16)));
    return X_E_SUCCESS;
  }
-@@ -383,7 +398,10 @@
+@@ -132,7 +151,10 @@
+   }
+ 
+   const auto& user_profile = REX_KERNEL_STATE()->user_profile();
+-  auto user_name = rex::string::to_utf16(user_profile->name());
++  std::string gamer_tag = user_profile->name();
++  if (netrelay::Active()) gamer_tag = netrelay::LocalName();
++  else if (!netrelay::PlayerName().empty()) gamer_tag = netrelay::PlayerName();
++  auto user_name = rex::string::to_utf16(gamer_tag);
+   rex::string::copy_and_swap_truncating(buffer, user_name, std::min(buffer_len, uint32_t(16)));
+   return X_E_SUCCESS;
+ }
+@@ -383,7 +405,10 @@
    }
  
    // If we deny everything, games should hopefully not try to do stuff.
@@ -11906,7 +11922,7 @@
  }
  
 --- a/src/system/function_dispatcher.cpp	2026-08-21 19:10:13.000000000 -0300
-+++ b/src/system/function_dispatcher.cpp	2026-11-14 13:00:16.340607900 -0300
++++ b/src/system/function_dispatcher.cpp	2026-11-14 13:24:33.892547900 -0300
 @@ -13,6 +13,9 @@
   *              role as a function dispatch table rather than a CPU emulator.
   */
@@ -12013,7 +12029,7 @@
    FunctionDispatcher* dispatcher = GetBoundFunctionDispatcher();
    if (!dispatcher) {
 --- a/src/system/xmemory.cpp	2026-08-21 19:10:13.000000000 -0300
-+++ b/src/system/xmemory.cpp	2026-11-14 13:00:16.991557600 -0300
++++ b/src/system/xmemory.cpp	2026-11-14 13:24:34.198023600 -0300
 @@ -556,6 +556,14 @@
    // Will be rounded to physical page boundaries internally, so just pass 1 as
    // the length - guranteed not to cross page boundaries also.
@@ -12167,7 +12183,7 @@
              rex::sat_sub(i * system_page_size_, host_address_offset()) >> page_size_shift_;
 --- a/src/kernel/xam/net_relay.cpp	1969-12-31 21:00:00.000000000 -0300
 +++ b/src/kernel/xam/net_relay.cpp	1969-12-31 21:00:00.000000000 -0300
-@@ -0,0 +1,559 @@
+@@ -0,0 +1,564 @@
 +/**
 + * MX Alive online relay - see net_relay.h.
 + */
@@ -12619,6 +12635,11 @@
 +uint64_t LocalXuid() {
 +  return S().xuid;
 +}
++std::string PlayerName() {
++  std::string n = REXCVAR_GET(net_name);
++  if (n.size() > 15) n.resize(15);
++  return n;
++}
 +std::string LocalName() {
 +  return S().name;
 +}
@@ -12729,7 +12750,7 @@
 +}  // namespace rex::kernel::xam::netrelay
 --- a/src/kernel/xam/net_relay.h	1969-12-31 21:00:00.000000000 -0300
 +++ b/src/kernel/xam/net_relay.h	1969-12-31 21:00:00.000000000 -0300
-@@ -0,0 +1,58 @@
+@@ -0,0 +1,60 @@
 +/**
 + * MX Alive online relay.
 + *
@@ -12759,6 +12780,8 @@
 +uint32_t LocalVip();  // host order, 0 until assigned
 +uint64_t LocalXuid();
 +std::string LocalName();
++// Name chosen by the player (cvar net_name); empty when not set. Valid offline too.
++std::string PlayerName();
 +
 +inline bool IsVirtual(uint32_t ip_host_order) {
 +  return (ip_host_order & kVipMask) == kVipNet;
