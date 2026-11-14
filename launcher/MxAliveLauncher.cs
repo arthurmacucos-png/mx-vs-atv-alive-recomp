@@ -53,6 +53,17 @@ namespace MxAliveLauncher
             { "Pela internet: ", "Over the internet: " },
             { "Não consegui descobrir o IP da internet (sem conexão?).", "Couldn't find the internet IP (offline?)." },
             { "Código da sala inválido.", "Invalid room code." },
+            { "Mande esse código para o amigo. Ele precisa estar na mesma rede do Radmin VPN que você.", "Send this code to your friend. They must be in the same Radmin VPN network as you." },
+            { "Online: Radmin VPN detectado, não precisa abrir porta no roteador.", "Online: Radmin VPN detected, no router port needed." },
+            { "Online: sala criada. Use o botão \"Meu código\" e mande o código para os amigos.", "Online: room created. Use the \"My code\" button and send the code to your friends." },
+            { "Online: o roteador não aceitou abrir a porta sozinho (UPnP desligado). Amigos na mesma rede entram normal; pela internet, ative o UPnP no roteador ou use um app de rede virtual (Radmin VPN) e passe o IP dele.",
+              "Online: the router did not open the port by itself (UPnP is off). Friends on the same network can join; over the internet, enable UPnP on the router or use a virtual LAN app (Radmin VPN) and share its IP." },
+            { "Online: porta aberta no roteador, mas a sua internet usa IP compartilhado (CGNAT: ", "Online: port opened on the router, but your internet uses a shared IP (CGNAT: " },
+            { "). Amigos de fora não conseguem entrar direto; use um app de rede virtual (Radmin VPN) e passe o IP dele no lugar do código.", "). Friends outside cannot connect directly; use a virtual LAN app (Radmin VPN) and share its IP instead of the code." },
+            { " aberta no roteador automaticamente (UPnP). Não precisa configurar nada.", " opened on the router automatically (UPnP). Nothing to configure." },
+            { "Online: porta UDP ", "Online: UDP port " },
+            { "Online: não consegui abrir a porta no roteador sozinho (", "Online: could not open the port on the router (" },
+            { "). Amigos na mesma rede entram normal; pela internet, ative o UPnP no roteador ou use um app de rede virtual (Radmin VPN).", "). Friends on the same network can join; over the internet, enable UPnP on the router or use a virtual LAN app (Radmin VPN)." },
             { "Seu nome", "Your name" },
             { "Online: sala criada. Passe para os amigos o seu IP: ", "Online: room created. Give your friends your IP: " },
             { " (libere a porta UDP ", " (forward UDP port " },
@@ -1042,6 +1053,15 @@ namespace MxAliveLauncher
 
         void ShowRoomCode()
         {
+            string radmin = RadminIp();
+            if (radmin != null)
+            {
+                string rc = EncodeRoomCode(radmin);
+                try { Clipboard.SetText(rc); } catch { }
+                Log("Código da sala copiado: " + rc + "   (Radmin VPN " + radmin + ")");
+                Log("Mande esse código para o amigo. Ele precisa estar na mesma rede do Radmin VPN que você.");
+                return;
+            }
             string pub = null;
             try
             {
@@ -1058,9 +1078,126 @@ namespace MxAliveLauncher
             try { Clipboard.SetText(copy); } catch { }
             Log("Código da sala copiado: " + copy);
             Log("Mesma casa/rede: " + localCode + "   (" + local + ")");
-            if (pub != null) Log("Pela internet: " + pubCode + "   (" + pub + ")  (libere a porta UDP " + settings.Get("net_port", "36015") + " no roteador se for pela internet)");
+            if (pub != null) Log("Pela internet: " + pubCode + "   (" + pub + ")");
             else Log("Não consegui descobrir o IP da internet (sem conexão?).");
             Log("Mande esse código para o amigo. Ele cola em \"Código da sala\" e escolhe \"Entrar na sala de um amigo\".");
+        }
+
+        // ---------- automatic port opening (UPnP) ----------
+        // The host needs UDP <port> reachable from the internet. Instead of
+        // asking the player to configure the router, ask the router itself
+        // through UPnP (Windows' built-in NATUPnP COM object). Done on a
+        // background thread because routers can take seconds to answer.
+        int mappedPort;
+
+        static object ComGet(object o, string name)
+        {
+            return o.GetType().InvokeMember(name, System.Reflection.BindingFlags.GetProperty, null, o, null);
+        }
+
+        static string RouteLocalIp()
+        {
+            try
+            {
+                // No packet is sent: connecting a UDP socket only picks the
+                // network card that reaches the internet.
+                using (var u = new System.Net.Sockets.UdpClient())
+                {
+                    u.Connect("8.8.8.8", 53);
+                    return ((System.Net.IPEndPoint)u.Client.LocalEndPoint).Address.ToString();
+                }
+            }
+            catch { return null; }
+        }
+
+        static bool IsPrivateOrCgnat(string ip)
+        {
+            System.Net.IPAddress a;
+            if (!System.Net.IPAddress.TryParse(ip, out a)) return false;
+            byte[] b = a.GetAddressBytes();
+            if (b.Length != 4) return false;
+            return b[0] == 10 || (b[0] == 172 && b[1] >= 16 && b[1] <= 31) || (b[0] == 192 && b[1] == 168) ||
+                   (b[0] == 100 && b[1] >= 64 && b[1] <= 127);
+        }
+
+        void OpenRouterPort(int port)
+        {
+            string local = RouteLocalIp();
+            var t = new System.Threading.Thread(delegate ()
+            {
+                string msg;
+                try
+                {
+                    Type nat = Type.GetTypeFromProgID("HNetCfg.NATUPnP");
+                    object upnp = Activator.CreateInstance(nat);
+                    object maps = ComGet(upnp, "StaticPortMappingCollection");
+                    if (maps == null || local == null)
+                    {
+                        msg = "Online: o roteador não aceitou abrir a porta sozinho (UPnP desligado). Amigos na mesma rede entram normal; pela internet, ative o UPnP no roteador ou use um app de rede virtual (Radmin VPN) e passe o IP dele.";
+                    }
+                    else
+                    {
+                        try { maps.GetType().InvokeMember("Remove", System.Reflection.BindingFlags.InvokeMethod, null, maps, new object[] { port, "UDP" }); } catch { }
+                        object m = maps.GetType().InvokeMember("Add", System.Reflection.BindingFlags.InvokeMethod, null, maps,
+                            new object[] { port, "UDP", port, local, true, "MX vs ATV Alive" });
+                        mappedPort = port;
+                        string ext = null;
+                        try { ext = (string)ComGet(m, "ExternalIPAddress"); } catch { }
+                        if (ext != null && IsPrivateOrCgnat(ext))
+                            msg = "Online: porta aberta no roteador, mas a sua internet usa IP compartilhado (CGNAT: " + ext + "). Amigos de fora não conseguem entrar direto; use um app de rede virtual (Radmin VPN) e passe o IP dele no lugar do código.";
+                        else
+                            msg = "Online: porta UDP " + port + " aberta no roteador automaticamente (UPnP). Não precisa configurar nada.";
+                    }
+                }
+                catch (Exception ex)
+                {
+                    msg = "Online: não consegui abrir a porta no roteador sozinho (" + ex.Message.Trim() + "). Amigos na mesma rede entram normal; pela internet, ative o UPnP no roteador ou use um app de rede virtual (Radmin VPN).";
+                }
+                try { BeginInvoke(new Action(delegate { Log(msg); })); } catch { }
+            });
+            t.IsBackground = true;
+            t.SetApartmentState(System.Threading.ApartmentState.STA);
+            t.Start();
+        }
+
+        void CloseRouterPort()
+        {
+            int port = mappedPort;
+            if (port == 0) return;
+            mappedPort = 0;
+            var t = new System.Threading.Thread(delegate ()
+            {
+                try
+                {
+                    object upnp = Activator.CreateInstance(Type.GetTypeFromProgID("HNetCfg.NATUPnP"));
+                    object maps = ComGet(upnp, "StaticPortMappingCollection");
+                    if (maps != null) maps.GetType().InvokeMember("Remove", System.Reflection.BindingFlags.InvokeMethod, null, maps, new object[] { port, "UDP" });
+                }
+                catch { }
+            });
+            t.IsBackground = true;
+            t.SetApartmentState(System.Threading.ApartmentState.STA);
+            t.Start();
+        }
+
+        // Radmin VPN gives every PC an address in 26.0.0.0/8 on its own adapter.
+        static string RadminIp()
+        {
+            try
+            {
+                foreach (var ni in System.Net.NetworkInformation.NetworkInterface.GetAllNetworkInterfaces())
+                {
+                    if (ni.OperationalStatus != System.Net.NetworkInformation.OperationalStatus.Up) continue;
+                    bool named = (ni.Description + " " + ni.Name).IndexOf("Radmin", StringComparison.OrdinalIgnoreCase) >= 0;
+                    foreach (var ua in ni.GetIPProperties().UnicastAddresses)
+                    {
+                        if (ua.Address.AddressFamily != System.Net.Sockets.AddressFamily.InterNetwork) continue;
+                        if (named || ua.Address.GetAddressBytes()[0] == 26) return ua.Address.ToString();
+                    }
+                }
+            }
+            catch { }
+            return null;
         }
 
         static string LocalIps()
@@ -1342,8 +1479,9 @@ namespace MxAliveLauncher
                 }
                 else
                 {
-                    Log("Online: sala criada. Passe para os amigos o seu IP: " + LocalIps() +
-                        " (libere a porta UDP " + netPort + " no roteador se for pela internet)");
+                    Log("Online: sala criada. Use o botão \"Meu código\" e mande o código para os amigos.");
+                    if (RadminIp() != null) Log("Online: Radmin VPN detectado, não precisa abrir porta no roteador.");
+                    else OpenRouterPort(int.Parse(netPort));
                 }
             }
 
@@ -1390,6 +1528,7 @@ namespace MxAliveLauncher
             int code = 0;
             try { code = game.ExitCode; } catch { }
             Log("Jogo fechado (código " + code + ").");
+            CloseRouterPort();
             play.Enabled = true; play.BackColor = Theme.Accent;
             stop.Enabled = false; stop.ForeColor = Theme.Dim;
             fpsLabel.Text = "";
