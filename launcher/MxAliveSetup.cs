@@ -61,6 +61,11 @@ namespace MxAliveSetup
             { "Preparar o rexglue para as novas correções", "Prepare rexglue for the new fixes" },
             { "Recompilar o módulo gráfico", "Rebuild the graphics module" },
             { "Instalar as DLLs novas no jogo", "Install the new DLLs into the game" },
+            { "O winget não funcionou neste PC. Baixando o instalador oficial direto (", "winget did not work on this PC. Downloading the official installer directly (" },
+            { "Baixando o instalador oficial direto (", "Downloading the official installer directly (" },
+            { ")... se o Windows pedir permissão, clique em Sim", ")... if Windows asks for permission, click Yes" },
+            { "  Instalador direto terminou com código ", "  Direct installer finished with code " },
+            { "  Falha no instalador direto (", "  Direct installer failed (" },
             { "  O winget deste PC é antigo e não aceitou uma opção. Tentando de novo de outro jeito...", "  This PC's winget is old and rejected an option. Trying again another way..." },
             { "  O winget deste PC está desatualizado. Abra a Microsoft Store, atualize o \"Instalador de Aplicativo\" (App Installer) e rode o instalador de novo.", "  This PC's winget is outdated. Open the Microsoft Store, update \"App Installer\" and run the installer again." },
             { "Recompilar o jogo (modo online; pode levar de 10 a 60 min)", "Rebuild the game (online mode; can take 10 to 60 min)" },
@@ -633,7 +638,7 @@ namespace MxAliveSetup
 
         static string FreshPath()
         {
-            return @"C:\Program Files\LLVM\bin;C:\Program Files\Git\cmd;" +
+            return @"C:\Program Files\LLVM\bin;C:\Program Files\Git\cmd;C:\Program Files\CMake\bin;" +
                 Environment.GetEnvironmentVariable("Path", EnvironmentVariableTarget.Machine) + ";" +
                 Environment.GetEnvironmentVariable("Path", EnvironmentVariableTarget.User) + ";" +
                 Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), @"Microsoft\WinGet\Links");
@@ -722,15 +727,18 @@ namespace MxAliveSetup
                 // 2. Toolchain.
                 SetStep(step, "run");
                 bool any = false;
-                if (!Have("git")) { any = true; Winget("Git.Git", null); }
-                if (!Have("cmake")) { any = true; Winget("Kitware.CMake", null); }
-                if (!Have("ninja")) { any = true; Winget("Ninja-build.Ninja", null); }
-                if (!Have("clang")) { any = true; Winget("LLVM.LLVM", null); }
+                // winget first; when it fails on this PC (old or broken winget),
+                // download the official installer directly.
+                if (!Have("git")) { any = true; Winget("Git.Git", null); if (!Have("git")) DirectInstall("git"); }
+                if (!Have("cmake")) { any = true; Winget("Kitware.CMake", null); if (!Have("cmake")) DirectInstall("cmake"); }
+                if (!Have("ninja")) { any = true; Winget("Ninja-build.Ninja", null); if (!Have("ninja")) DirectInstall("ninja"); }
+                if (!Have("clang")) { any = true; Winget("LLVM.LLVM", null); if (!Have("clang")) DirectInstall("clang"); }
                 if (!HaveVisualStudio())
                 {
                     any = true;
                     Log("Instalando Visual Studio 2022 Build Tools (C++). Pode levar 10-20 minutos.");
                     Winget("Microsoft.VisualStudio.2022.BuildTools", "--override \"--wait --passive --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended\"");
+                    if (!HaveVisualStudio()) DirectInstall("vs");
                 }
                 foreach (var tool in new[] { "git", "cmake", "ninja", "clang" })
                     if (!Have(tool)) throw new StepFailed(tool + " não ficou disponível. Reinicie o PC e rode o instalador de novo.");
@@ -1004,6 +1012,108 @@ namespace MxAliveSetup
             }
             if (code == InvalidArguments)
                 Log("  O winget deste PC está desatualizado. Abra a Microsoft Store, atualize o \"Instalador de Aplicativo\" (App Installer) e rode o instalador de novo.");
+        }
+
+        // ---------- direct downloads (when winget does not work) ----------
+        // Latest release asset from GitHub, or the pinned fallback URL.
+        string LatestAsset(string repo, string pattern, string fallback)
+        {
+            try
+            {
+                ServicePointManager.SecurityProtocol = (SecurityProtocolType)3072; // TLS 1.2
+                using (var wc = new WebClient())
+                {
+                    wc.Headers.Add("User-Agent", "MXAliveSetup");
+                    string json = wc.DownloadString("https://api.github.com/repos/" + repo + "/releases/latest");
+                    foreach (System.Text.RegularExpressions.Match m in
+                        System.Text.RegularExpressions.Regex.Matches(json, "\"browser_download_url\"\\s*:\\s*\"([^\"]+)\""))
+                    {
+                        string url = m.Groups[1].Value;
+                        if (System.Text.RegularExpressions.Regex.IsMatch(url, pattern)) return url;
+                    }
+                }
+            }
+            catch (Exception ex) { Log("  (não consegui consultar a versão mais nova: " + ex.Message + ")"); }
+            return fallback;
+        }
+
+        string DownloadTo(string url, string fileName)
+        {
+            string dir = Path.Combine(Path.GetTempPath(), "MXAliveSetup");
+            Directory.CreateDirectory(dir);
+            string dest = Path.Combine(dir, fileName);
+            Log("  Baixando " + url);
+            ServicePointManager.SecurityProtocol = (SecurityProtocolType)3072; // TLS 1.2
+            using (var wc = new WebClient())
+            {
+                wc.Headers.Add("User-Agent", "MXAliveSetup");
+                wc.DownloadFile(url, dest);
+            }
+            return dest;
+        }
+
+        // Runs an installer elevated (UAC prompt) and waits for it.
+        int RunElevated(string file, string args)
+        {
+            Log("  > " + Path.GetFileName(file) + " " + args);
+            var psi = new ProcessStartInfo(file, args) { UseShellExecute = true, Verb = "runas" };
+            using (var p = Process.Start(psi))
+            {
+                p.WaitForExit();
+                return p.ExitCode;
+            }
+        }
+
+        void DirectInstall(string tool)
+        {
+            try
+            {
+                Log("O winget não funcionou neste PC. Baixando o instalador oficial direto (" + tool + ")...");
+                Ui(() => status.Text = L.T("Baixando o instalador oficial direto (" + tool + ")... se o Windows pedir permissão, clique em Sim"));
+                int code = 0;
+                if (tool == "git")
+                {
+                    string url = LatestAsset("git-for-windows/git", @"/Git-[\d.]+-64-bit\.exe$",
+                        "https://github.com/git-for-windows/git/releases/download/v2.47.1.windows.1/Git-2.47.1-64-bit.exe");
+                    code = RunElevated(DownloadTo(url, "git-setup.exe"), "/VERYSILENT /NORESTART /NOCANCEL /SP-");
+                }
+                else if (tool == "cmake")
+                {
+                    string url = LatestAsset("Kitware/CMake", @"/cmake-[\d.]+-windows-x86_64\.msi$",
+                        "https://github.com/Kitware/CMake/releases/download/v3.31.2/cmake-3.31.2-windows-x86_64.msi");
+                    code = RunElevated("msiexec.exe", "/i \"" + DownloadTo(url, "cmake.msi") + "\" /passive /norestart ADD_CMAKE_TO_PATH=System");
+                }
+                else if (tool == "ninja")
+                {
+                    string url = LatestAsset("ninja-build/ninja", @"/ninja-win\.zip$",
+                        "https://github.com/ninja-build/ninja/releases/download/v1.12.1/ninja-win.zip");
+                    string zip = DownloadTo(url, "ninja-win.zip");
+                    // No installer: ninja.exe goes to a per-user folder this setup already searches.
+                    string links = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), @"Microsoft\WinGet\Links");
+                    Directory.CreateDirectory(links);
+                    using (var z = System.IO.Compression.ZipFile.OpenRead(zip))
+                        foreach (var e in z.Entries)
+                            if (e.Name.Equals("ninja.exe", StringComparison.OrdinalIgnoreCase))
+                                System.IO.Compression.ZipFileExtensions.ExtractToFile(e, Path.Combine(links, "ninja.exe"), true);
+                }
+                else if (tool == "clang")
+                {
+                    // Pinned: newer LLVM releases no longer ship a Windows installer,
+                    // and 22.1.8 is the version this project was tested with.
+                    string url = "https://github.com/llvm/llvm-project/releases/download/llvmorg-22.1.8/LLVM-22.1.8-win64.exe";
+                    code = RunElevated(DownloadTo(url, "llvm-setup.exe"), "/S");
+                }
+                else if (tool == "vs")
+                {
+                    code = RunElevated(DownloadTo("https://aka.ms/vs/17/release/vs_BuildTools.exe", "vs_BuildTools.exe"),
+                        "--passive --wait --norestart --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended");
+                }
+                Log("  Instalador direto terminou com código " + code);
+            }
+            catch (Exception ex)
+            {
+                Log("  Falha no instalador direto (" + tool + "): " + ex.Message);
+            }
         }
 
         static bool HaveVisualStudio()
