@@ -809,6 +809,9 @@ namespace MxAliveLauncher
             };
             Controls.Add(header);
 
+            var discord = MakeButton(header, "Discord", 756, 12, 88, 28);
+            discord.FlatAppearance.BorderColor = Color.FromArgb(88, 101, 242);
+            discord.Click += delegate { try { Process.Start("https://discord.gg/9B6cTDRAp7"); } catch { } };
             langButton = MakeButton(header, "EN", 852, 12, 52, 28);
             langButton.Click += delegate { ToggleLanguage(); };
             banner = new PictureBox { SizeMode = PictureBoxSizeMode.Zoom, BackColor = Color.Black };
