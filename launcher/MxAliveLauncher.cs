@@ -620,6 +620,7 @@ namespace MxAliveLauncher
             Load += delegate { FitRestoredSizeToScreen(); };
 
             LoadSettings();
+            AutoGpuSettings();
             ApplyLanguage();
             EventHandler syncMnk = delegate { mnkMouse.Enabled = sensitivity.Enabled = mnk.Checked; };
             mnk.CheckedChanged += syncMnk;
@@ -994,6 +995,47 @@ namespace MxAliveLauncher
             log = new TextBox { Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Vertical, BackColor = Color.FromArgb(12, 12, 14), ForeColor = Color.FromArgb(200, 200, 200), Font = Theme.Mono, BorderStyle = BorderStyle.FixedSingle, WordWrap = true };
             log.SetBounds(16, 820, 888, 96);
             Controls.Add(log);
+        }
+
+        // ---------- GPU auto setup ----------
+        // Picks the rendering mode for the graphics card. It runs again only when the
+        // card changes, so a choice the player makes by hand is kept.
+        static string DetectGpu()
+        {
+            var names = new List<string>();
+            try
+            {
+                using (var q = new System.Management.ManagementObjectSearcher("SELECT Name FROM Win32_VideoController"))
+                    foreach (System.Management.ManagementObject o in q.Get())
+                    {
+                        string n = Convert.ToString(o["Name"]);
+                        if (!string.IsNullOrEmpty(n)) names.Add(n.Trim());
+                    }
+            }
+            catch { }
+            // Laptops with two cards: the dedicated one runs the game.
+            foreach (var key in new[] { "NVIDIA", "AMD", "Radeon", "Intel" })
+                foreach (var n in names)
+                    if (n.IndexOf(key, StringComparison.OrdinalIgnoreCase) >= 0) return n;
+            return names.Count > 0 ? names[0] : "";
+        }
+
+        void AutoGpuSettings()
+        {
+            string gpu = DetectGpu();
+            if (gpu.Length == 0) return;
+            if (settings.Get("gpu_auto_for", "") == gpu) return;
+            bool nvidia = gpu.IndexOf("NVIDIA", StringComparison.OrdinalIgnoreCase) >= 0;
+            // NVIDIA flickers with the previous-frame copy: use the exact copy there.
+            SelectByValue(gpuMode, nvidia ? "full" : "default");
+            asyncReadback.Checked = !nvidia;
+            settings.Set("gpu_auto_for", gpu);
+            settings.Set("gpu_mode", Val(gpuMode));
+            settings.Set("async_readback", asyncReadback.Checked);
+            settings.Save();
+            Log("Placa de vídeo: " + gpu + " -> " + (nvidia
+                ? "modo NVIDIA (cópia exata, sem piscar)."
+                : "modo padrão (rápido)."));
         }
 
         // ---------- settings ----------
