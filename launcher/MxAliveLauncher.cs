@@ -85,7 +85,7 @@ namespace MxAliveLauncher
             { "Tela cheia", "Fullscreen" },
             { "Renderização", "Rendering" },
             { "Padrão (rápido)", "Default (fast)" },
-            { "ROV (precisão, NVIDIA)", "ROV (accuracy, NVIDIA)" },
+            { "ROV (precisão, mais pesado)", "ROV (accuracy, heavier)" },
             { "Cópia exata (sem piscar)", "Exact copy (no flicker)" },
             { "ROV + cópia exata", "ROV + exact copy" },
             { "60 FPS é o modo testado e estável.", "60 FPS is the tested, stable mode." },
@@ -887,7 +887,7 @@ namespace MxAliveLauncher
             MakeLabel(s, "Renderização", 16, 144);
             gpuMode = MakeCombo(s, 170, 144, 250,
                 new Option("Padrão (rápido)", "default"),
-                new Option("ROV (precisão, NVIDIA)", "rov"),
+                new Option("ROV (precisão, mais pesado)", "rov"),
                 new Option("Cópia exata (sem piscar)", "full"),
                 new Option("ROV + cópia exata", "rov_full"));
             MakeHint(s,
