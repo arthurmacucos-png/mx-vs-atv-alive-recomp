@@ -1026,6 +1026,15 @@ namespace MxAliveLauncher
             if (gpu.Length == 0) return;
             if (settings.Get("gpu_auto_for", "") == gpu) return;
             bool nvidia = gpu.IndexOf("NVIDIA", StringComparison.OrdinalIgnoreCase) >= 0;
+            // A mode the player already picked by hand (e.g. ROV working on a
+            // GTX 1050 Ti) is kept; only the untouched default is changed.
+            if (settings.Get("gpu_mode", "default") != "default")
+            {
+                settings.Set("gpu_auto_for", gpu);
+                settings.Save();
+                Log("Placa de vídeo: " + gpu + " (mantida a renderização escolhida).");
+                return;
+            }
             // NVIDIA flickers with the previous-frame copy: use the exact copy there.
             SelectByValue(gpuMode, nvidia ? "full" : "default");
             asyncReadback.Checked = !nvidia;
